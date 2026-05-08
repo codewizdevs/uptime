@@ -12,6 +12,10 @@ If you want a simple, fast, self-hostable alternative to Uptime Kuma, Healthchec
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
+**Monitor detail** — 24h / 7d / 30d uptime, downtime, P95 / min / max / avg response times, response-time chart (24h / 7d / 30d ranges), recent checks log, and full incident history.
+
+![Monitor detail with response-time chart and incidents](docs/screenshots/monitor-detail.png)
+
 **New monitor** — HTTP probe with status / body-string / JSON-path assertions, custom headers, failure threshold, and Cloudflare-aware mode.
 
 ![New monitor](docs/screenshots/monitor-form.png)
