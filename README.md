@@ -1,8 +1,32 @@
 # Uptime
 
-A self-hosted, open-source uptime monitor written in Node.js. Active HTTP/HTTPS checks, passive heartbeat URLs (Healthchecks.io style), incident tracking, response-time graphs, and multi-channel alerts (Discord, email, generic webhook) — in a single Express + EJS app with a SQLite or MySQL backend.
+A self-hosted, open-source uptime monitor written in Node.js. Active HTTP/HTTPS checks, passive heartbeat URLs (Healthchecks.io style), incident tracking, response-time graphs, multi-channel alerts (Discord, email, generic webhook), and **one-click JSON import / export** for portable monitor + channel backups — in a single Express + EJS app with a SQLite or MySQL backend.
 
 If you want a simple, fast, self-hostable alternative to Uptime Kuma, Healthchecks.io, Statping, or Gatus — without Docker required, without a heavy stack — this is for you.
+
+---
+
+## Screenshots
+
+**Dashboard** — compact monitor cards, live polling, dark mode, filters by state / type / Cloudflare mode, and full-text search.
+
+![Dashboard](docs/screenshots/dashboard.png)
+
+**New monitor** — HTTP probe with status / body-string / JSON-path assertions, custom headers, failure threshold, and Cloudflare-aware mode.
+
+![New monitor](docs/screenshots/monitor-form.png)
+
+**Notification channels** — attach any combination of Discord, generic webhook, and email channels per monitor.
+
+![Notification channels](docs/screenshots/channels.png)
+
+**Customizable templates** — per-event (DOWN / RECOVERED / CHALLENGED / TEST) titles & bodies with `{{placeholders}}`, one click to insert at cursor, one click to reset to default.
+
+![Channel templates with placeholders](docs/screenshots/channel-templates.png)
+
+**Backup & restore (import / export)** — back up all (or a selected subset of) monitors, channels, and SMTP settings to a portable JSON file, and restore it on another instance with a configurable conflict strategy (skip / replace / rename).
+
+![Backup and restore - JSON import / export](docs/screenshots/backup-restore.png)
 
 ---
 
@@ -51,7 +75,7 @@ If you want a simple, fast, self-hostable alternative to Uptime Kuma, Healthchec
 
 ### Settings
 - **SMTP settings panel** for email notifications, with built-in "Send test email" and "Verify connection" buttons. Password is never re-displayed; leave blank to keep the existing one.
-- **Backup & restore** — export all or selected monitors, channels, and SMTP settings to a JSON file. Restore with conflict strategy (skip / replace / rename) and selective per-section import. Live preview shows what's in the file before you commit.
+- **Backup & restore (JSON import / export)** — export all or selected monitors, channels, and SMTP settings to a portable JSON file. Restore with conflict strategy (skip / replace / rename) and selective per-section import. Live preview shows what's in the file before you commit. Great for migrating between instances, version-controlling your monitor config, or seeding a fresh install.
 - **Whitelabeling** via env vars: custom app name, tagline, logo, favicon, footer text/link, or hide the credit line entirely.
 
 ### Security
