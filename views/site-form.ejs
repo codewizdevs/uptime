@@ -1,0 +1,230 @@
+<div class="page-header d-print-none">
+  <div class="row g-2 align-items-center">
+    <div class="col">
+      <div class="page-pretitle">
+        <a href="/" class="text-secondary text-decoration-none">
+          <i class="ti ti-arrow-left me-1"></i> Back to dashboard
+        </a>
+      </div>
+      <h2 class="page-title"><%= title %></h2>
+    </div>
+  </div>
+</div>
+
+<form method="post" action="<%= formAction %>" class="card" id="site-form">
+  <div class="card-body">
+    <h3 class="card-title">Basics</h3>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label required">Name</label>
+        <input type="text" name="name" class="form-control" value="<%= site.name || '' %>" required maxlength="120" placeholder="My website">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label required">Monitor type</label>
+        <select name="monitor_type" id="monitor_type" class="form-select">
+          <option value="active" <%= site.monitor_type === 'active' ? 'selected' : '' %>>Active - we ping the URL</option>
+          <option value="heartbeat" <%= site.monitor_type === 'heartbeat' ? 'selected' : '' %>>Heartbeat - the service pings us</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-body border-top" data-section="active" <%= site.monitor_type === 'heartbeat' ? 'hidden' : '' %>>
+    <h3 class="card-title">HTTP probe</h3>
+    <div class="row g-3">
+      <div class="col-md-9">
+        <label class="form-label required">URL</label>
+        <input type="url" name="url" class="form-control" value="<%= site.url || '' %>" placeholder="https://example.com/health">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Method</label>
+        <select name="method" class="form-select">
+          <% ['GET','HEAD','POST','PUT','PATCH','DELETE','OPTIONS'].forEach(function(m) { %>
+            <option value="<%= m %>" <%= (site.method || 'GET') === m ? 'selected' : '' %>><%= m %></option>
+          <% }); %>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Interval (seconds)</label>
+        <input type="number" name="interval_seconds" class="form-control" min="10" value="<%= site.interval_seconds || 60 %>">
+        <div class="form-hint">Minimum 10s. Cloudflare mode raises floor to 60s.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Timeout (ms)</label>
+        <input type="number" name="timeout_ms" class="form-control" min="1000" value="<%= site.timeout_ms || 10000 %>">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Failure threshold</label>
+        <input type="number" name="failure_threshold" class="form-control" min="1" value="<%= site.failure_threshold || 1 %>">
+        <div class="form-hint">Alert only after N consecutive failed checks.</div>
+      </div>
+    </div>
+
+    <h4 class="card-title mt-4">Assertion</h4>
+    <div class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label">Check type</label>
+        <select name="check_type" id="check_type" class="form-select">
+          <option value="status" <%= (site.check_type || 'status') === 'status' ? 'selected' : '' %>>HTTP status</option>
+          <option value="string" <%= site.check_type === 'string' ? 'selected' : '' %>>Body contains string</option>
+          <option value="json" <%= site.check_type === 'json' ? 'selected' : '' %>>JSON path equals value</option>
+        </select>
+      </div>
+      <div class="col-md-9" data-check="status" <%= (site.check_type && site.check_type !== 'status') ? 'hidden' : '' %>>
+        <label class="form-label">Expected status</label>
+        <input type="text" name="expected_status" class="form-control" value="<%= site.expected_status || '200' %>" placeholder="200 or 200,204">
+      </div>
+      <div class="col-md-9" data-check="string" <%= site.check_type !== 'string' ? 'hidden' : '' %>>
+        <label class="form-label">Expected substring (case sensitive)</label>
+        <input type="text" name="expected_string" class="form-control" value="<%= site.expected_string || '' %>" placeholder="OK">
+      </div>
+      <div class="col-md-9" data-check="json" <%= site.check_type !== 'json' ? 'hidden' : '' %>>
+        <div class="row g-2">
+          <div class="col-md-6">
+            <label class="form-label">JSON path</label>
+            <input type="text" name="json_path" class="form-control" value="<%= site.json_path || '' %>" placeholder="data.status">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Expected value</label>
+            <input type="text" name="expected_json_value" class="form-control" value="<%= site.expected_json_value || '' %>" placeholder="ok">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h4 class="card-title mt-4">Cloudflare & headers</h4>
+    <div class="row g-3">
+      <div class="col-12">
+        <label class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="cloudflare_mode" value="1" <%= site.cloudflare_mode ? 'checked' : '' %>>
+          <span class="form-check-label">Cloudflare-aware mode</span>
+        </label>
+        <div class="form-hint">Enables HEAD-first probe, 60s minimum interval, and adaptive backoff on challenges. Always-on: realistic browser headers and challenge detection.</div>
+      </div>
+      <div class="col-12">
+        <label class="form-label">Custom request headers (JSON object, optional)</label>
+        <textarea name="request_headers" class="form-control font-monospace" rows="4" placeholder='{"X-API-Key": "...", "CF-Access-Client-Id": "..."}'><%= site.request_headers_str || '' %></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-body border-top" data-section="heartbeat" <%= site.monitor_type !== 'heartbeat' ? 'hidden' : '' %>>
+    <h3 class="card-title">Heartbeat parameters</h3>
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label">Expected interval (seconds)</label>
+        <input type="number" name="interval_seconds_hb" class="form-control" min="10" value="<%= site.monitor_type === 'heartbeat' ? site.interval_seconds : 300 %>" data-mirror="interval_seconds">
+        <div class="form-hint">How often the service is expected to ping us.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Grace period (seconds)</label>
+        <input type="number" name="heartbeat_grace_seconds" class="form-control" min="5" value="<%= site.heartbeat_grace_seconds || 60 %>">
+        <div class="form-hint">Tolerated lateness before flipping DOWN.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Failure threshold</label>
+        <input type="number" name="failure_threshold_hb" class="form-control" min="1" value="<%= site.failure_threshold || 1 %>" data-mirror="failure_threshold">
+      </div>
+      <% if (site.heartbeat_token) { %>
+        <div class="col-12">
+          <label class="form-label">Ping URL</label>
+          <div class="input-group">
+            <input type="text" class="form-control font-monospace" id="heartbeat-url" readonly value="<%= publicBaseUrl %>/ping/<%= site.heartbeat_token %>">
+            <button type="button" class="btn" data-copy="#heartbeat-url"><i class="ti ti-copy"></i> Copy</button>
+          </div>
+          <div class="form-hint">Hit this URL from the service you want to monitor on the chosen interval.</div>
+        </div>
+      <% } else { %>
+        <div class="col-12">
+          <div class="alert alert-info mb-0 small">A unique ping URL will be generated when you save this monitor.</div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="card-body border-top">
+    <h3 class="card-title d-flex align-items-center">
+      <span>Notification channels</span>
+      <a href="/channels" target="_blank" rel="noopener" class="ms-auto small text-secondary text-decoration-none">
+        <i class="ti ti-external-link me-1"></i> Manage channels
+      </a>
+    </h3>
+    <% if (typeof allChannels === 'undefined' || allChannels.length === 0) { %>
+      <div class="alert alert-info small mb-0">
+        No channels exist yet. <a href="/channels/new?type=discord" class="alert-link">Create one</a> (Discord, generic webhook, or email) and come back here to attach it.
+      </div>
+    <% } else { %>
+      <div class="form-hint mb-2">Select one or more. DOWN, RECOVERED, and CHALLENGED events fan out to all selected channels.</div>
+      <div class="row g-2">
+        <% allChannels.forEach(function(c) { %>
+          <div class="col-md-6">
+            <label class="form-selectgroup-item w-100">
+              <input type="checkbox" name="channel_ids" value="<%= c.id %>" class="form-selectgroup-input"
+                     <%= (typeof selectedChannelIds !== 'undefined' && selectedChannelIds.includes(c.id)) ? 'checked' : '' %>
+                     <%= c.enabled ? '' : 'disabled' %>>
+              <span class="form-selectgroup-label d-flex align-items-center">
+                <span class="me-2">
+                  <% if (c.type === 'discord') { %><i class="ti ti-brand-discord text-indigo"></i><% } %>
+                  <% if (c.type === 'webhook') { %><i class="ti ti-webhook text-cyan"></i><% } %>
+                  <% if (c.type === 'email') { %><i class="ti ti-mail text-blue"></i><% } %>
+                </span>
+                <span class="flex-fill">
+                  <span class="d-block fw-medium"><%= c.name %></span>
+                  <span class="d-block small text-secondary text-truncate" style="max-width: 240px;">
+                    <% if (c.type === 'discord') { %>discord webhook<% } %>
+                    <% if (c.type === 'webhook') { %><%= c.config.url || '' %><% } %>
+                    <% if (c.type === 'email') { %><%= (c.config.to || []).join(', ') %><% } %>
+                  </span>
+                </span>
+                <% if (!c.enabled) { %><span class="badge bg-secondary-lt ms-2">disabled</span><% } %>
+              </span>
+            </label>
+          </div>
+        <% }); %>
+      </div>
+    <% } %>
+    <div class="mt-3">
+      <label class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" name="paused" value="1" <%= site.paused ? 'checked' : '' %>>
+        <span class="form-check-label">Paused</span>
+      </label>
+      <div class="form-hint">Stops scheduled checks (and accepted heartbeats) without deleting the monitor.</div>
+    </div>
+  </div>
+
+  <div class="card-footer text-end">
+    <% if (site.id) { %>
+      <button type="button" class="btn btn-outline-danger me-auto" data-modal-open="#confirm-delete">
+        <i class="ti ti-trash me-1"></i> Delete monitor
+      </button>
+    <% } %>
+    <a href="<%= site.id ? '/sites/' + site.id : '/' %>" class="btn btn-link">Cancel</a>
+    <button type="submit" class="btn btn-primary"><%= submitLabel %></button>
+  </div>
+</form>
+
+<% if (site.id) { %>
+  <div class="modal" id="confirm-delete">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Delete monitor?</h5>
+          <button type="button" class="btn-close" data-modal-close></button>
+        </div>
+        <div class="modal-body">
+          This permanently removes <strong><%= site.name %></strong> and all its checks and incidents. This cannot be undone.
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-link" data-modal-close>Cancel</button>
+          <form method="post" action="/sites/<%= site.id %>/delete" class="d-inline">
+            <button type="submit" class="btn btn-danger">
+              <i class="ti ti-trash me-1"></i> Yes, delete
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<script src="/static/js/site-form.js"></script>

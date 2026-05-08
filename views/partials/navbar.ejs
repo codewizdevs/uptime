@@ -1,0 +1,60 @@
+<header class="navbar navbar-expand-md d-print-none">
+  <div class="container-xl">
+    <h1 class="navbar-brand navbar-brand-autodark d-none-navbar-horizontal pe-0 pe-md-3 mb-0">
+      <a href="/" class="d-flex align-items-center text-decoration-none">
+        <img src="/branding/logo?v=<%= assetV %>" width="36" height="36" alt="<%= branding.appName %>" class="me-2">
+        <span class="fw-semibold fs-3 text-body"><%= branding.appName %></span>
+      </a>
+    </h1>
+
+    <% if (typeof user !== 'undefined' && user) { %>
+      <div class="d-flex align-items-center ms-auto navbar-actions">
+        <div class="dropdown-wrap">
+          <button id="settings-toggle" class="btn btn-icon btn-ghost-secondary"
+                  data-dropdown-toggle="#settings-menu" aria-haspopup="menu" aria-expanded="false" title="Settings">
+            <i class="ti ti-settings"></i>
+          </button>
+          <div class="dropdown-menu" id="settings-menu" role="menu">
+            <div class="dropdown-header">Configuration</div>
+            <a class="dropdown-item" href="/channels"><i class="ti ti-bell me-2"></i> Notification channels</a>
+            <a class="dropdown-item" href="/settings/smtp"><i class="ti ti-mail me-2"></i> Email (SMTP)</a>
+            <div class="dropdown-divider"></div>
+            <a class="dropdown-item" href="/settings/backup"><i class="ti ti-file-zip me-2"></i> Backup &amp; restore</a>
+          </div>
+        </div>
+
+        <button id="theme-toggle" class="btn btn-icon btn-ghost-secondary" title="Toggle theme">
+          <i class="ti ti-sun theme-icon-light"></i>
+          <i class="ti ti-moon theme-icon-dark"></i>
+        </button>
+
+        <a href="/sites/new" class="btn btn-primary">
+          <i class="ti ti-plus me-1"></i> New monitor
+        </a>
+
+        <span class="navbar-divider"></span>
+
+        <div class="user-chip">
+          <span class="avatar avatar-sm bg-primary-lt text-primary fw-semibold">
+            <%= user.username.slice(0, 1).toUpperCase() %>
+          </span>
+          <span class="user-chip-name d-none d-md-inline"><%= user.username %></span>
+          <form method="post" action="/logout" class="m-0">
+            <button type="submit" class="btn btn-icon btn-logout" title="Sign out" aria-label="Sign out">
+              <i class="ti ti-logout-2"></i>
+            </button>
+          </form>
+        </div>
+      </div>
+    <% } %>
+  </div>
+</header>
+
+<% if (typeof appDebug !== 'undefined' && appDebug) { %>
+  <div class="alert alert-warning border-0 rounded-0 mb-0 py-2">
+    <div class="container-xl small">
+      <i class="ti ti-bug me-1"></i>
+      <strong>Debug mode active.</strong> Discord webhooks are suppressed, full payloads are written to <code>logs/app.log</code>. Trace-level logging is on.
+    </div>
+  </div>
+<% } %>

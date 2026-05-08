@@ -1,0 +1,306 @@
+<div class="page-header d-print-none">
+  <div class="row g-2 align-items-center">
+    <div class="col">
+      <div class="page-pretitle">
+        <a href="/" class="text-secondary text-decoration-none">
+          <i class="ti ti-arrow-left me-1"></i> Dashboard
+        </a>
+      </div>
+      <h2 class="page-title"><i class="ti ti-file-zip me-2"></i> Backup &amp; restore</h2>
+      <div class="text-secondary mt-1">
+        Export your monitors, channels and SMTP settings to a JSON file - or restore them from one.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-xl-6">
+    <form method="post" action="/settings/backup/export" class="card backup-card">
+      <div class="card-body">
+        <h3 class="card-title mb-1"><i class="ti ti-cloud-download me-2 text-primary"></i> Export</h3>
+        <div class="text-secondary small mb-3">
+          Pick what you want included, then download a portable JSON file.
+        </div>
+
+        <div class="mb-3">
+          <div class="form-label">Monitors</div>
+          <label class="form-check">
+            <input class="form-check-input" type="radio" name="scope" value="all" checked id="scope-all">
+            <span class="form-check-label">All monitors <span class="text-secondary">(<%= sites.length %>)</span></span>
+          </label>
+          <label class="form-check">
+            <input class="form-check-input" type="radio" name="scope" value="selected" id="scope-selected">
+            <span class="form-check-label">Selected monitors only</span>
+          </label>
+        </div>
+
+        <div id="monitor-picker" class="monitor-picker mb-3" hidden>
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <div class="input-icon flex-fill">
+              <span class="input-icon-addon"><i class="ti ti-search"></i></span>
+              <input type="search" class="form-control form-control-sm" id="monitor-search"
+                     placeholder="Filter monitors..." autocomplete="off">
+            </div>
+            <button type="button" class="btn btn-sm btn-ghost-secondary" data-action="select-all">
+              All
+            </button>
+            <button type="button" class="btn btn-sm btn-ghost-secondary" data-action="select-none">
+              None
+            </button>
+          </div>
+          <div class="monitor-picker-list">
+            <% if (sites.length === 0) { %>
+              <div class="text-secondary p-3 text-center">No monitors yet.</div>
+            <% } else { %>
+              <% sites.forEach(function(s) { %>
+                <label class="monitor-pick-row" data-name="<%= (s.name || '').toLowerCase() %>">
+                  <input type="checkbox" name="site_ids" value="<%= s.id %>" class="form-check-input">
+                  <span class="monitor-pick-name"><%= s.name %></span>
+                  <% if (s.monitor_type === 'heartbeat') { %>
+                    <span class="badge bg-purple-lt ms-2 small"><i class="ti ti-activity-heartbeat me-1"></i>heartbeat</span>
+                  <% } %>
+                  <% if (s.paused) { %>
+                    <span class="badge bg-secondary-lt ms-1 small"><i class="ti ti-player-pause me-1"></i>paused</span>
+                  <% } %>
+                </label>
+              <% }); %>
+            <% } %>
+          </div>
+          <div class="small text-secondary mt-2" id="monitor-pick-count">0 selected</div>
+        </div>
+
+        <div class="mb-3">
+          <div class="form-label">Include</div>
+          <label class="form-check">
+            <input class="form-check-input" type="checkbox" name="include_channels" value="1" checked id="opt-channels">
+            <span class="form-check-label">
+              Notification channels
+              <span class="d-block text-secondary small">Discord webhooks, generic webhooks, email lists. Recommended.</span>
+            </span>
+          </label>
+          <label class="form-check">
+            <input class="form-check-input" type="checkbox" name="include_smtp" value="1" id="opt-smtp">
+            <span class="form-check-label">
+              SMTP settings (host, port, from address)
+              <span class="d-block text-secondary small">Required for email channels to work after a restore.</span>
+            </span>
+          </label>
+          <label class="form-check ms-4" id="opt-smtp-pass-wrap" hidden>
+            <input class="form-check-input" type="checkbox" name="include_smtp_password" value="1" id="opt-smtp-pass">
+            <span class="form-check-label">
+              Include SMTP password
+              <span class="d-block text-warning small">
+                <i class="ti ti-alert-triangle me-1"></i> Sensitive: anyone with this file can send mail as you.
+              </span>
+            </span>
+          </label>
+        </div>
+
+        <div class="alert alert-warning small mb-0">
+          <strong>Heads-up:</strong> the JSON contains Discord webhook URLs and any
+          custom request headers (which may include API keys). Treat the file as a secret.
+        </div>
+      </div>
+      <div class="card-footer text-end">
+        <button type="submit" class="btn btn-primary"><i class="ti ti-download me-1"></i> Download backup</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="col-12 col-xl-6">
+    <form method="post" action="/settings/backup/import" class="card backup-card" id="import-form">
+      <div class="card-body">
+        <h3 class="card-title mb-1"><i class="ti ti-cloud-upload me-2 text-primary"></i> Import</h3>
+        <div class="text-secondary small mb-3">
+          Restore from a previously exported JSON file - or paste it below.
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Backup file</label>
+          <input type="file" id="import-file" accept="application/json,.json" class="form-control">
+          <div class="form-hint">We don't upload the file - we read it locally and pre-fill the JSON below.</div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">JSON content</label>
+          <textarea name="payload" id="import-payload" class="form-control font-monospace import-textarea"
+                    rows="10" placeholder='{ "version": 1, "monitors": [...] }' spellcheck="false"></textarea>
+          <div class="form-hint d-flex justify-content-between flex-wrap gap-2">
+            <span id="import-preview" class="text-secondary">No backup loaded yet.</span>
+            <button type="button" class="btn btn-sm btn-ghost-secondary" id="import-clear">
+              <i class="ti ti-x me-1"></i> Clear
+            </button>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <div class="form-label">If a monitor or channel with the same name exists</div>
+          <label class="form-check">
+            <input class="form-check-input" type="radio" name="conflict" value="skip" checked>
+            <span class="form-check-label">Skip it (default - safest)</span>
+          </label>
+          <label class="form-check">
+            <input class="form-check-input" type="radio" name="conflict" value="replace">
+            <span class="form-check-label">Replace existing settings (keeps history &amp; statistics)</span>
+          </label>
+          <label class="form-check">
+            <input class="form-check-input" type="radio" name="conflict" value="rename">
+            <span class="form-check-label">Create as a copy ("Name (2)", "Name (3)", ...)</span>
+          </label>
+        </div>
+
+        <div class="mb-1">
+          <div class="form-label">Apply</div>
+          <label class="form-check">
+            <input class="form-check-input" type="checkbox" name="import_channels" value="1" checked>
+            <span class="form-check-label">Channels</span>
+          </label>
+          <label class="form-check">
+            <input class="form-check-input" type="checkbox" name="import_monitors" value="1" checked>
+            <span class="form-check-label">Monitors (and their channel attachments)</span>
+          </label>
+          <label class="form-check">
+            <input class="form-check-input" type="checkbox" name="import_smtp" value="1">
+            <span class="form-check-label">SMTP settings (only if present in backup)</span>
+          </label>
+        </div>
+      </div>
+      <div class="card-footer text-end">
+        <button type="submit" class="btn btn-primary" id="import-submit" disabled>
+          <i class="ti ti-upload me-1"></i> Import
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function () {
+  var scopeRadios = document.querySelectorAll('input[name="scope"]');
+  var picker = document.getElementById('monitor-picker');
+  var rows = picker ? picker.querySelectorAll('.monitor-pick-row') : [];
+  var search = document.getElementById('monitor-search');
+  var countEl = document.getElementById('monitor-pick-count');
+
+  function syncPicker() {
+    var sel = document.querySelector('input[name="scope"]:checked');
+    if (!picker) return;
+    picker.hidden = !sel || sel.value !== 'selected';
+  }
+  function updateCount() {
+    if (!countEl || !picker) return;
+    var n = picker.querySelectorAll('input[name="site_ids"]:checked').length;
+    countEl.textContent = n + ' selected';
+  }
+  scopeRadios.forEach(function (r) { r.addEventListener('change', syncPicker); });
+  if (picker) {
+    picker.addEventListener('change', updateCount);
+    rows.forEach(function (row) {
+      row.addEventListener('click', function (ev) {
+        if (ev.target.tagName === 'INPUT') return;
+      });
+    });
+    var allBtn = picker.querySelector('[data-action="select-all"]');
+    var noneBtn = picker.querySelector('[data-action="select-none"]');
+    if (allBtn) allBtn.addEventListener('click', function () {
+      rows.forEach(function (r) {
+        if (r.style.display === 'none') return;
+        var cb = r.querySelector('input[type="checkbox"]');
+        if (cb) cb.checked = true;
+      });
+      updateCount();
+    });
+    if (noneBtn) noneBtn.addEventListener('click', function () {
+      rows.forEach(function (r) {
+        var cb = r.querySelector('input[type="checkbox"]');
+        if (cb) cb.checked = false;
+      });
+      updateCount();
+    });
+    if (search) search.addEventListener('input', function () {
+      var q = (search.value || '').trim().toLowerCase();
+      rows.forEach(function (row) {
+        var name = row.getAttribute('data-name') || '';
+        row.style.display = (!q || name.indexOf(q) !== -1) ? '' : 'none';
+      });
+    });
+  }
+  syncPicker();
+  updateCount();
+
+  var smtpCb = document.getElementById('opt-smtp');
+  var smtpPassWrap = document.getElementById('opt-smtp-pass-wrap');
+  var smtpPassCb = document.getElementById('opt-smtp-pass');
+  function syncSmtp() {
+    if (!smtpCb || !smtpPassWrap) return;
+    smtpPassWrap.hidden = !smtpCb.checked;
+    if (!smtpCb.checked && smtpPassCb) smtpPassCb.checked = false;
+  }
+  if (smtpCb) smtpCb.addEventListener('change', syncSmtp);
+  syncSmtp();
+
+  var fileInput = document.getElementById('import-file');
+  var textarea = document.getElementById('import-payload');
+  var preview = document.getElementById('import-preview');
+  var clearBtn = document.getElementById('import-clear');
+  var submitBtn = document.getElementById('import-submit');
+
+  function summarize(text) {
+    if (!text || !text.trim()) {
+      preview.textContent = 'No backup loaded yet.';
+      preview.className = 'text-secondary';
+      submitBtn.disabled = true;
+      return;
+    }
+    try {
+      var data = JSON.parse(text);
+      var monitors = Array.isArray(data.monitors) ? data.monitors.length : 0;
+      var channels = Array.isArray(data.channels) ? data.channels.length : 0;
+      var hasSmtp = !!data.settings;
+      var v = data.version || '?';
+      var when = data.exported_at ? new Date(data.exported_at).toLocaleString() : 'unknown date';
+      preview.innerHTML =
+        '<i class="ti ti-circle-check me-1 text-success"></i>' +
+        'Backup v' + v + ' from ' + when +
+        ' - <strong>' + monitors + '</strong> monitor(s), <strong>' + channels + '</strong> channel(s)' +
+        (hasSmtp ? ', includes SMTP' : '');
+      preview.className = '';
+      submitBtn.disabled = false;
+    } catch (e) {
+      preview.innerHTML = '<i class="ti ti-alert-triangle me-1 text-warning"></i> Invalid JSON: ' + e.message;
+      preview.className = 'text-warning';
+      submitBtn.disabled = true;
+    }
+  }
+
+  if (fileInput) {
+    fileInput.addEventListener('change', function () {
+      var f = fileInput.files && fileInput.files[0];
+      if (!f) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        textarea.value = String(reader.result || '');
+        summarize(textarea.value);
+      };
+      reader.onerror = function () {
+        preview.textContent = 'Failed to read file.';
+      };
+      reader.readAsText(f);
+    });
+  }
+  if (textarea) {
+    var t;
+    textarea.addEventListener('input', function () {
+      clearTimeout(t);
+      t = setTimeout(function () { summarize(textarea.value); }, 200);
+    });
+  }
+  if (clearBtn) clearBtn.addEventListener('click', function () {
+    textarea.value = '';
+    if (fileInput) fileInput.value = '';
+    summarize('');
+  });
+  summarize(textarea.value);
+})();
+</script>

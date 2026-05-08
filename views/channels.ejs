@@ -1,0 +1,84 @@
+<div class="page-header d-print-none">
+  <div class="row g-2 align-items-center">
+    <div class="col">
+      <h2 class="page-title">Notification channels</h2>
+      <div class="text-secondary mt-1">Where DOWN, RECOVERED, and challenged events are delivered. Attach channels to a monitor on its edit page.</div>
+    </div>
+    <div class="col-auto d-flex gap-2">
+      <a href="/channels/new?type=discord" class="btn btn-primary">
+        <i class="ti ti-brand-discord me-1"></i> New Discord
+      </a>
+      <a href="/channels/new?type=webhook" class="btn btn-outline-primary">
+        <i class="ti ti-webhook me-1"></i> New webhook
+      </a>
+      <a href="/channels/new?type=email" class="btn btn-outline-primary">
+        <i class="ti ti-mail me-1"></i> New email
+      </a>
+    </div>
+  </div>
+</div>
+
+<% if (channels.length === 0) { %>
+  <div class="empty">
+    <p class="empty-title">No channels yet</p>
+    <p class="empty-subtitle text-secondary">Create a Discord webhook, generic webhook, or email recipient list, then attach it to one or more monitors.</p>
+    <div class="empty-action">
+      <a href="/channels/new?type=discord" class="btn btn-primary"><i class="ti ti-plus me-1"></i> Create your first channel</a>
+    </div>
+  </div>
+<% } else { %>
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Target</th>
+            <th>Status</th>
+            <th class="w-1"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% channels.forEach(function(c) { %>
+            <tr>
+              <td>
+                <a href="/channels/<%= c.id %>/edit" class="text-body fw-semibold text-decoration-none"><%= c.name %></a>
+              </td>
+              <td>
+                <% if (c.type === 'discord') { %>
+                  <span class="badge bg-indigo-lt"><i class="ti ti-brand-discord me-1"></i> Discord</span>
+                <% } else if (c.type === 'webhook') { %>
+                  <span class="badge bg-cyan-lt"><i class="ti ti-webhook me-1"></i> Webhook</span>
+                <% } else { %>
+                  <span class="badge bg-blue-lt"><i class="ti ti-mail me-1"></i> Email</span>
+                <% } %>
+              </td>
+              <td class="small text-secondary text-truncate" style="max-width: 360px;">
+                <% if (c.type === 'discord') { %>
+                  <%= (c.config.webhook_url || '').replace(/(https:\/\/discord\.com\/api\/webhooks\/[0-9]+\/).+/, '$1...') %>
+                <% } else if (c.type === 'webhook') { %>
+                  <%= (c.config.method || 'POST') %> <%= c.config.url || '' %>
+                <% } else { %>
+                  <%= (c.config.to || []).join(', ') %>
+                <% } %>
+              </td>
+              <td>
+                <% if (c.enabled) { %>
+                  <span class="status status-green"><span class="status-dot status-dot-animated"></span> enabled</span>
+                <% } else { %>
+                  <span class="status status-secondary"><span class="status-dot"></span> disabled</span>
+                <% } %>
+              </td>
+              <td class="text-end">
+                <a href="/channels/<%= c.id %>/edit" class="btn btn-sm btn-ghost-secondary">
+                  <i class="ti ti-edit me-1"></i> Edit
+                </a>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% } %>

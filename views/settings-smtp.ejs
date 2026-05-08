@@ -1,0 +1,76 @@
+<div class="page-header d-print-none">
+  <div class="row g-2 align-items-center">
+    <div class="col">
+      <div class="page-pretitle"><a href="/" class="text-secondary text-decoration-none"><i class="ti ti-arrow-left me-1"></i> Dashboard</a></div>
+      <h2 class="page-title"><i class="ti ti-mail me-2"></i> Email settings (SMTP)</h2>
+      <div class="text-secondary mt-1">Used by all email channels. The password is never displayed again after saving.</div>
+    </div>
+  </div>
+</div>
+
+<form method="post" action="/settings/smtp" class="card mb-3">
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-8">
+        <label class="form-label required">SMTP host</label>
+        <input type="text" name="smtp_host" class="form-control" value="<%= settings.smtp_host || '' %>" placeholder="smtp.gmail.com" required>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label required">Port</label>
+        <input type="number" name="smtp_port" class="form-control" value="<%= settings.smtp_port || 587 %>" required>
+      </div>
+      <div class="col-md-2 d-flex align-items-end">
+        <label class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" name="smtp_secure" value="1" <%= settings.smtp_secure ? 'checked' : '' %>>
+          <span class="form-check-label">TLS (465)</span>
+        </label>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Username</label>
+        <input type="text" name="smtp_user" class="form-control" value="<%= settings.smtp_user || '' %>" placeholder="username or full email" autocomplete="off">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Password</label>
+        <input type="password" name="smtp_pass" class="form-control" value="" placeholder="<%= settings.smtp_pass ? '(unchanged - leave blank to keep)' : '(none stored yet)' %>" autocomplete="new-password">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label required">From address</label>
+        <input type="email" name="smtp_from_address" class="form-control" value="<%= settings.smtp_from_address || '' %>" placeholder="uptime@example.com" required>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">From display name</label>
+        <input type="text" name="smtp_from_name" class="form-control" value="<%= settings.smtp_from_name || 'Uptime' %>">
+      </div>
+    </div>
+  </div>
+  <div class="card-footer text-end">
+    <button type="submit" class="btn btn-primary">Save settings</button>
+  </div>
+</form>
+
+<div class="card">
+  <div class="card-body">
+    <h3 class="card-title">Send a test email</h3>
+    <% if (!isConfigured) { %>
+      <div class="alert alert-warning small mb-3">
+        Save SMTP host and from address first.
+      </div>
+    <% } %>
+    <div class="row g-2 align-items-end">
+      <div class="col-md-8">
+        <form method="post" action="/settings/smtp/test" class="row g-2 align-items-end m-0" id="test-email-form">
+          <div class="col-12">
+            <label class="form-label">Recipient</label>
+            <input type="email" name="to" class="form-control" placeholder="me@example.com" required>
+          </div>
+        </form>
+      </div>
+      <div class="col-md-4 text-end d-flex gap-2 justify-content-end settings-smtp-actions">
+        <form method="post" action="/settings/smtp/verify" class="m-0">
+          <button type="submit" class="btn btn-outline-secondary"><i class="ti ti-plug-connected me-1"></i> Verify connection</button>
+        </form>
+        <button type="submit" form="test-email-form" class="btn btn-primary"><i class="ti ti-send me-1"></i> Send test</button>
+      </div>
+    </div>
+  </div>
+</div>

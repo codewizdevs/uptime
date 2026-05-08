@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Uptime">
+  <rect width="64" height="64" rx="14" fill="#182433"/>
+  <path d="M8 36 L20 36 L24 26 L30 44 L36 22 L42 38 L46 32 L51 32 L57 22"
+        fill="none"
+        stroke="#2fb344"
+        stroke-width="4"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+  <path d="M51 32 L57 22 L52.5 22 M57 22 L57 26.5"
+        fill="none"
+        stroke="#2fb344"
+        stroke-width="4"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+</svg>

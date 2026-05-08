@@ -1,0 +1,72 @@
+{
+  "name": "uptime",
+  "version": "1.0.0",
+  "description": "Self-hosted, open-source uptime monitor in Node.js with HTTP/HTTPS checks, body and JSON-path assertions, passive heartbeat URLs (Healthchecks.io style), incident tracking, response-time graphs, multi-channel alerts (Discord, email, webhook), Cloudflare-aware probing, dark-mode dashboard, SQLite or MySQL.",
+  "main": "src/server.js",
+  "type": "commonjs",
+  "license": "MIT",
+  "author": "codewizdevs (https://github.com/codewizdevs)",
+  "homepage": "https://github.com/codewizdevs/uptime#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/codewizdevs/uptime.git"
+  },
+  "bugs": {
+    "url": "https://github.com/codewizdevs/uptime/issues"
+  },
+  "keywords": [
+    "uptime",
+    "uptime-monitor",
+    "uptime-monitoring",
+    "monitoring",
+    "self-hosted",
+    "open-source",
+    "status-page",
+    "healthcheck",
+    "heartbeat",
+    "cron-monitoring",
+    "dead-mans-switch",
+    "http-monitoring",
+    "https-monitoring",
+    "website-monitoring",
+    "incident-tracking",
+    "alerting",
+    "discord-webhook",
+    "email-alerts",
+    "webhook",
+    "cloudflare",
+    "nodejs",
+    "express",
+    "sqlite",
+    "mysql",
+    "dashboard",
+    "tabler"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop uptime",
+    "pm2:logs": "pm2 logs uptime"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.9.0",
+    "connect-flash": "^0.1.1",
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "express": "^4.21.2",
+    "express-ejs-layouts": "^2.5.1",
+    "express-session": "^1.18.1",
+    "mysql2": "^3.11.5",
+    "nodemailer": "^8.0.7",
+    "pino": "^9.5.0",
+    "pino-http": "^10.3.0",
+    "pino-pretty": "^11.3.0",
+    "pino-roll": "^2.0.0",
+    "undici": "^6.21.0"
+  }
+}

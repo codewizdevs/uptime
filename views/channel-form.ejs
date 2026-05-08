@@ -1,0 +1,190 @@
+<div class="page-header d-print-none">
+  <div class="row g-2 align-items-center">
+    <div class="col">
+      <div class="page-pretitle"><a href="/channels" class="text-secondary text-decoration-none"><i class="ti ti-arrow-left me-1"></i> Channels</a></div>
+      <h2 class="page-title">
+        <% if (channel.type === 'discord') { %><i class="ti ti-brand-discord me-2"></i><% } %>
+        <% if (channel.type === 'webhook') { %><i class="ti ti-webhook me-2"></i><% } %>
+        <% if (channel.type === 'email') { %><i class="ti ti-mail me-2"></i><% } %>
+        <%= title %>
+      </h2>
+    </div>
+    <% if (channel.id) { %>
+      <div class="col-auto d-flex gap-2">
+        <form method="post" action="/channels/<%= channel.id %>/test" class="m-0">
+          <button type="submit" class="btn btn-outline-primary"><i class="ti ti-send me-1"></i> Send test</button>
+        </form>
+      </div>
+    <% } %>
+  </div>
+</div>
+
+<form method="post" action="<%= formAction %>" class="card">
+  <div class="card-body">
+    <input type="hidden" name="type" value="<%= channel.type %>">
+    <div class="row g-3">
+      <div class="col-md-8">
+        <label class="form-label required">Channel name</label>
+        <input type="text" name="name" class="form-control" value="<%= channel.name || '' %>" placeholder="Team Discord, on-call email, ..." required maxlength="120">
+      </div>
+      <div class="col-md-4 d-flex align-items-end">
+        <label class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" name="enabled" value="1" <%= channel.enabled ? 'checked' : '' %>>
+          <span class="form-check-label">Enabled</span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <% if (channel.type === 'discord') { %>
+    <div class="card-body border-top">
+      <h3 class="card-title">Discord webhook</h3>
+      <div class="mb-3">
+        <label class="form-label required">Webhook URL</label>
+        <input type="url" name="webhook_url" class="form-control font-monospace" value="<%= channel.config.webhook_url || '' %>" placeholder="https://discord.com/api/webhooks/..." required>
+        <div class="form-hint">Server settings -> Integrations -> Webhooks in Discord. Channel events render as embeds.</div>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (channel.type === 'webhook') { %>
+    <div class="card-body border-top">
+      <h3 class="card-title">Generic webhook</h3>
+      <div class="row g-3">
+        <div class="col-md-9">
+          <label class="form-label required">URL</label>
+          <input type="url" name="url" class="form-control font-monospace" value="<%= channel.config.url || '' %>" required>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Method</label>
+          <select name="method" class="form-select">
+            <% ['POST','PUT','PATCH'].forEach(function(m) { %>
+              <option value="<%= m %>" <%= (channel.config.method || 'POST') === m ? 'selected' : '' %>><%= m %></option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Content-Type</label>
+          <input type="text" name="content_type" class="form-control" value="<%= channel.config.content_type || 'application/json' %>">
+        </div>
+        <div class="col-md-8">
+          <label class="form-label">Custom headers (JSON object)</label>
+          <textarea name="headers_json" class="form-control font-monospace" rows="3" placeholder='{"Authorization": "Bearer ..."}'><%= channel.config.headers && Object.keys(channel.config.headers).length ? JSON.stringify(channel.config.headers, null, 2) : '' %></textarea>
+        </div>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (channel.type === 'email') { %>
+    <div class="card-body border-top">
+      <h3 class="card-title">Email recipients</h3>
+      <div class="alert alert-info small">
+        Make sure your <a href="/settings/smtp" class="alert-link">SMTP settings</a> are configured first.
+      </div>
+      <div class="mb-3">
+        <label class="form-label required">Recipients</label>
+        <textarea name="to_emails" class="form-control" rows="3" placeholder="alice@example.com, bob@example.com" required><%= (channel.config.to || []).join(', ') %></textarea>
+        <div class="form-hint">Comma, semicolon, space, or newline separated.</div>
+      </div>
+    </div>
+  <% } %>
+
+  <div class="card-body border-top">
+    <div class="d-flex align-items-center mb-2">
+      <h3 class="card-title mb-0">Message templates</h3>
+      <span class="ms-auto small text-secondary">click a placeholder to insert at cursor</span>
+    </div>
+    <div class="placeholders mb-3">
+      <% PLACEHOLDERS.forEach(function(p) { %>
+        <button type="button" class="placeholder-chip" data-placeholder="{{<%= p.key %>}}" title="<%= p.desc %>">
+          <code>{{<%= p.key %>}}</code>
+        </button>
+      <% }); %>
+    </div>
+
+    <% var eventLabels = { down: 'DOWN message', recovered: 'RECOVERED message', challenged: 'CHALLENGED message', test: 'TEST message' }; %>
+    <% var eventIcons  = { down: 'ti-circle-x text-danger', recovered: 'ti-circle-check text-success', challenged: 'ti-shield-half-filled text-warning', test: 'ti-flask text-azure' }; %>
+    <% var eventHints  = { down: 'Sent when a monitor goes down.', recovered: 'Sent when a monitor returns to up.', challenged: 'Sent once after 5 consecutive Cloudflare challenges.', test: 'Used by the "Send test" button. Has sample data filled in.' }; %>
+
+    <% EVENT_TYPES.forEach(function(ev, idx) { %>
+      <% var def = (DEFAULT_TEMPLATES[channel.type] && DEFAULT_TEMPLATES[channel.type][ev]) || { title: '', body: '' }; %>
+      <% var cur = (channel.config.templates && channel.config.templates[ev]) || { title: '', body: '' }; %>
+      <details class="template-event" <%= ev === 'down' ? 'open' : '' %>>
+        <summary>
+          <i class="ti <%= eventIcons[ev] %> me-2"></i>
+          <span class="fw-semibold"><%= eventLabels[ev] %></span>
+          <span class="text-secondary small ms-2"><%= eventHints[ev] %></span>
+        </summary>
+        <div class="template-event-body">
+          <% if (channel.type !== 'webhook') { %>
+            <div class="mb-3">
+              <div class="d-flex align-items-baseline mb-1">
+                <label class="form-label mb-0"><%= channel.type === 'email' ? 'Subject' : 'Title' %></label>
+                <button type="button" class="btn btn-link btn-sm ms-auto p-0 reset-default" data-default="<%= def.title %>" data-target="tpl_<%= ev %>_title">reset to default</button>
+              </div>
+              <input type="text" name="tpl_<%= ev %>_title" id="tpl_<%= ev %>_title"
+                     class="form-control template-input"
+                     value="<%= cur.title || '' %>"
+                     placeholder="<%= def.title %>">
+              <div class="form-hint">Leave empty to use the default: <code><%= def.title %></code></div>
+            </div>
+          <% } %>
+          <div>
+            <div class="d-flex align-items-baseline mb-1">
+              <label class="form-label mb-0"><%= channel.type === 'webhook' ? 'Request body' : 'Body' %></label>
+              <button type="button" class="btn btn-link btn-sm ms-auto p-0 reset-default" data-default="<%= def.body %>" data-target="tpl_<%= ev %>_body">reset to default</button>
+            </div>
+            <textarea name="tpl_<%= ev %>_body" id="tpl_<%= ev %>_body"
+                      class="form-control font-monospace template-input"
+                      rows="<%= channel.type === 'webhook' ? 10 : 5 %>"
+                      placeholder="<%= def.body %>"><%= cur.body || '' %></textarea>
+            <div class="form-hint">
+              <% if (channel.type === 'discord') { %>
+                Discord embed description. Markdown supported (<code>**bold**</code>, <code>`code`</code>, <code>\n</code> for line breaks).
+              <% } else if (channel.type === 'email') { %>
+                Plain-text email body. Bold (<code>**...**</code>) and inline code (<code>`...`</code>) become HTML in the rich part.
+              <% } else { %>
+                Raw HTTP request body. Use the same content-type set above. Default is JSON.
+              <% } %>
+              Leave empty to fall back to the default template.
+            </div>
+          </div>
+        </div>
+      </details>
+    <% }); %>
+  </div>
+
+  <div class="card-footer text-end">
+    <% if (channel.id) { %>
+      <button type="button" class="btn btn-outline-danger me-auto" data-modal-open="#confirm-delete-channel">
+        <i class="ti ti-trash me-1"></i> Delete channel
+      </button>
+    <% } %>
+    <a href="/channels" class="btn btn-link">Cancel</a>
+    <button type="submit" class="btn btn-primary"><%= submitLabel %></button>
+  </div>
+</form>
+
+<% if (channel.id) { %>
+  <div class="modal" id="confirm-delete-channel">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Delete channel?</h5>
+          <button type="button" class="btn-close" data-modal-close></button>
+        </div>
+        <div class="modal-body">
+          Removes <strong><%= channel.name %></strong> from all monitors that use it. Their attachment is deleted; the monitors themselves stay.
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-link" data-modal-close>Cancel</button>
+          <form method="post" action="/channels/<%= channel.id %>/delete" class="d-inline">
+            <button type="submit" class="btn btn-danger"><i class="ti ti-trash me-1"></i> Delete</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<script src="/static/js/channel-form.js"></script>

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en" data-bs-theme="<%= typeof theme !== 'undefined' ? theme : 'dark' %>">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Sign in - <%= branding.appName %></title>
+  <link rel="icon" href="/branding/favicon?v=<%= typeof assetV !== 'undefined' ? assetV : Date.now() %>">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/css/tabler.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.34.0/dist/tabler-icons.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/notyf@3.10.0/notyf.min.css">
+  <link rel="stylesheet" href="/static/css/app.css?v=<%= typeof assetV !== 'undefined' ? assetV : Date.now() %>">
+  <script>
+    (function () {
+      try {
+        var m = document.cookie.match(/(?:^|;\s*)theme=([^;]+)/);
+        document.documentElement.setAttribute('data-bs-theme', m && m[1] ? decodeURIComponent(m[1]) : 'dark');
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body class="d-flex flex-column bg-body-tertiary">
+  <div class="page page-center">
+    <div class="container container-tight py-4">
+      <div class="text-center mb-4">
+        <a href="/" class="d-inline-flex align-items-center text-decoration-none">
+          <img src="/branding/logo?v=<%= typeof assetV !== 'undefined' ? assetV : Date.now() %>" width="56" height="56" alt="<%= branding.appName %>">
+        </a>
+        <h1 class="h2 mt-3 mb-0"><%= branding.appName %></h1>
+        <div class="text-secondary small">Sign in to continue</div>
+      </div>
+      <form class="card card-md" method="post" action="/login" autocomplete="off">
+        <div class="card-body">
+          <h2 class="h2 text-center mb-4">Sign in</h2>
+          <div class="mb-3">
+            <label class="form-label">Username</label>
+            <input type="text" name="username" class="form-control" placeholder="admin" autofocus required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Password</label>
+            <input type="password" name="password" class="form-control" placeholder="Your password" required>
+          </div>
+          <div class="form-footer">
+            <button type="submit" class="btn btn-primary w-100">
+              <i class="ti ti-login me-1"></i> Sign in
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/notyf@3.10.0/notyf.min.js"></script>
+  <script>
+    window.__flash = <%- JSON.stringify({
+      success: (typeof flash !== 'undefined' && flash.success) || [],
+      error:   (typeof flash !== 'undefined' && flash.error)   || [],
+      warning: (typeof flash !== 'undefined' && flash.warning) || [],
+    }).replace(/</g, '\\u003c').replace(/-->/g, '--\\u003e') %>;
+  </script>
+  <script src="/static/js/notyf-init.js"></script>
+</body>
+</html>

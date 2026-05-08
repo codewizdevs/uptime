@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en" data-bs-theme="<%= typeof theme !== 'undefined' ? theme : 'dark' %>">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="referrer" content="no-referrer">
+  <title><%= typeof title !== 'undefined' ? title + ' - ' + branding.appName : branding.appName %></title>
+
+  <link rel="icon" href="/branding/favicon?v=<%= assetV %>">
+  <link rel="apple-touch-icon" href="/branding/favicon?v=<%= assetV %>">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/css/tabler.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.34.0/dist/tabler-icons.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/notyf@3.10.0/notyf.min.css">
+  <link rel="stylesheet" href="/static/css/app.css?v=<%= assetV %>">
+
+  <script>
+    (function () {
+      try {
+        var m = document.cookie.match(/(?:^|;\s*)theme=([^;]+)/);
+        document.documentElement.setAttribute('data-bs-theme', m && m[1] ? decodeURIComponent(m[1]) : 'dark');
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+  <div class="page">
+    <%- include('partials/navbar') %>
+    <div class="page-wrapper">
+      <div class="page-body">
+        <div class="container-xl">
+          <%- body %>
+        </div>
+      </div>
+      <%- include('partials/footer') %>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/notyf@3.10.0/notyf.min.js"></script>
+  <script>
+    window.__flash = <%- JSON.stringify({
+      success: (typeof flash !== 'undefined' && flash.success) || [],
+      error:   (typeof flash !== 'undefined' && flash.error)   || [],
+      warning: (typeof flash !== 'undefined' && flash.warning) || [],
+    }).replace(/</g, '\\u003c').replace(/-->/g, '--\\u003e') %>;
+  </script>
+  <script src="/static/js/notyf-init.js"></script>
+  <script src="/static/js/theme.js"></script>
+  <script src="/static/js/modal.js"></script>
+  <script src="/static/js/dropdown.js"></script>
+</body>
+</html>

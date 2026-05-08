@@ -1,0 +1,14 @@
+<div class="empty">
+  <div class="empty-icon">
+    <i class="ti ti-alert-triangle" style="font-size: 4rem;"></i>
+  </div>
+  <p class="empty-title"><%= title || 'Something went wrong' %></p>
+  <p class="empty-subtitle text-secondary">
+    <% if (typeof error !== 'undefined') { %>
+      <pre class="text-start small"><%= error %></pre>
+    <% } %>
+  </p>
+  <div class="empty-action">
+    <a href="/" class="btn btn-primary"><i class="ti ti-home me-1"></i> Back home</a>
+  </div>
+</div>

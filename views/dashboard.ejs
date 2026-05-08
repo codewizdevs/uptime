@@ -1,0 +1,267 @@
+<% var f = filters || {}; var hasAny = total > 0; %>
+<div class="page-header d-print-none mb-4">
+  <div class="row g-2 align-items-center">
+    <div class="col">
+      <h2 class="page-title">Monitors</h2>
+      <div class="text-secondary mt-1">
+        <%= total %> total<% if (hasFilters) { %> - filtered<% } %> - status updates every 5 seconds
+      </div>
+    </div>
+    <div class="col-auto">
+      <a href="/sites/new" class="btn btn-primary d-none d-sm-inline-flex">
+        <i class="ti ti-plus me-1"></i> Add monitor
+      </a>
+    </div>
+  </div>
+</div>
+
+<form method="get" action="/" class="dashboard-filters card mb-3" id="dashboard-filters">
+  <div class="card-body py-2">
+    <div class="row g-2 align-items-center">
+      <div class="col-12 col-md">
+        <div class="input-icon">
+          <span class="input-icon-addon"><i class="ti ti-search"></i></span>
+          <input type="search" class="form-control" name="q" id="filter-q" value="<%= f.q || '' %>"
+                 placeholder="Search by name or URL ..." autocomplete="off" maxlength="120">
+        </div>
+      </div>
+
+      <div class="col-12 col-md-auto">
+        <div class="filter-pills" data-filter-group="state">
+          <% var states = [
+            { v: '',       l: 'All states',  i: 'ti-asterisk' },
+            { v: 'up',     l: 'Up',          i: 'ti-circle-check', cls: 'pill-up' },
+            { v: 'down',   l: 'Down',        i: 'ti-circle-x',     cls: 'pill-down' },
+            { v: 'unknown', l: 'Unknown',    i: 'ti-help-circle',  cls: 'pill-unknown' },
+            { v: 'paused', l: 'Paused',      i: 'ti-player-pause', cls: 'pill-paused' },
+          ]; %>
+          <% states.forEach(function(s) { %>
+            <button type="button" class="filter-pill <%= s.cls || '' %> <%= (f.state || '') === s.v ? 'is-active' : '' %>"
+                    data-value="<%= s.v %>" title="<%= s.l %>">
+              <i class="ti <%= s.i %>"></i><span class="d-none d-xl-inline ms-1"><%= s.l %></span>
+            </button>
+          <% }); %>
+        </div>
+        <input type="hidden" name="state" id="filter-state" value="<%= f.state || '' %>">
+      </div>
+
+      <div class="col-12 col-md-auto">
+        <div class="filter-pills" data-filter-group="type">
+          <% var types = [
+            { v: '',          l: 'All types', i: 'ti-asterisk' },
+            { v: 'active',    l: 'Active',    i: 'ti-world' },
+            { v: 'heartbeat', l: 'Heartbeat', i: 'ti-heartbeat' },
+          ]; %>
+          <% types.forEach(function(t) { %>
+            <button type="button" class="filter-pill <%= (f.type || '') === t.v ? 'is-active' : '' %>"
+                    data-value="<%= t.v %>" title="<%= t.l %>">
+              <i class="ti <%= t.i %>"></i><span class="d-none d-xl-inline ms-1"><%= t.l %></span>
+            </button>
+          <% }); %>
+        </div>
+        <input type="hidden" name="type" id="filter-type" value="<%= f.type || '' %>">
+      </div>
+
+      <div class="col-auto">
+        <div class="filter-pills" data-filter-group="cf">
+          <% var cfs = [
+            { v: '',    l: 'CF: any', i: 'ti-asterisk' },
+            { v: 'on',  l: 'CF on',   i: 'ti-shield-check' },
+            { v: 'off', l: 'CF off',  i: 'ti-shield-off' },
+          ]; %>
+          <% cfs.forEach(function(c) { %>
+            <button type="button" class="filter-pill <%= (f.cf || '') === c.v ? 'is-active' : '' %>"
+                    data-value="<%= c.v %>" title="<%= c.l %>">
+              <i class="ti <%= c.i %>"></i><span class="d-none d-xxl-inline ms-1"><%= c.l %></span>
+            </button>
+          <% }); %>
+        </div>
+        <input type="hidden" name="cf" id="filter-cf" value="<%= f.cf || '' %>">
+      </div>
+
+      <% if (hasFilters) { %>
+        <div class="col-auto">
+          <a href="/" class="btn btn-link text-secondary px-1" title="Clear filters">
+            <i class="ti ti-x me-1"></i>Clear
+          </a>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</form>
+
+<% if (total === 0) { %>
+  <% if (hasFilters) { %>
+    <div class="empty">
+      <p class="empty-title">No monitors match your filters</p>
+      <p class="empty-subtitle text-secondary">Try a different search term, or clear the filters to see everything.</p>
+      <div class="empty-action">
+        <a href="/" class="btn btn-link">Clear filters</a>
+      </div>
+    </div>
+  <% } else { %>
+    <div class="empty">
+      <div class="empty-img">
+        <img src="/branding/logo?v=<%= assetV %>" width="80" height="80" alt="<%= branding.appName %>">
+      </div>
+      <p class="empty-title">No monitors yet</p>
+      <p class="empty-subtitle text-secondary">Add your first site or service to start tracking uptime, response time and incidents.</p>
+      <div class="empty-action">
+        <a href="/sites/new" class="btn btn-primary">
+          <i class="ti ti-plus me-1"></i> Create your first monitor
+        </a>
+      </div>
+    </div>
+  <% } %>
+<% } else { %>
+  <div class="row row-cards row-cards-tight" id="site-cards">
+    <% sites.forEach(function(s) {
+        var stateColor = s.paused ? 'secondary' : (s.current_state === 'down' ? 'danger' : (s.current_state === 'up' ? 'success' : 'muted'));
+        var uptimePct = s.uptime24;
+        var uptimeColor = 'text-secondary';
+        if (uptimePct != null) {
+          if (uptimePct >= 99) uptimeColor = 'text-success';
+          else if (uptimePct >= 90) uptimeColor = 'text-warning';
+          else uptimeColor = 'text-danger';
+        }
+    %>
+      <div class="col-12 col-sm-6 col-lg-4 col-xxl-3">
+        <div class="card site-card site-card-compact h-100" data-site-id="<%= s.id %>">
+          <div class="card-status-start bg-<%= stateColor %>" data-role="stripe"></div>
+          <button type="button"
+                  class="site-card-delete btn btn-icon btn-ghost-danger"
+                  data-site-id="<%= s.id %>"
+                  data-site-name="<%= s.name %>"
+                  title="Delete monitor"
+                  aria-label="Delete monitor">
+            <i class="ti ti-trash"></i>
+          </button>
+          <div class="card-body">
+            <div class="site-card-head">
+              <span class="status-dot status-dot-animated bg-<%= stateColor %>" data-role="dot"></span>
+              <a href="/sites/<%= s.id %>" class="site-name stretched-link" title="<%= s.name %>"><%= s.name %></a>
+            </div>
+
+            <div class="site-meta" title="<%= s.url || '' %>">
+              <% if (s.monitor_type === 'heartbeat') { %>
+                <i class="ti ti-heartbeat"></i><span class="site-meta-text">Heartbeat - <%= s.interval_seconds %>s +<%= s.heartbeat_grace_seconds %>s grace</span>
+              <% } else { %>
+                <i class="ti ti-world"></i><span class="site-meta-text"><%= s.url %></span>
+              <% } %>
+            </div>
+
+            <% var hasFlags = s.cloudflare_mode || s.failure_threshold > 1 || s.paused; %>
+            <% if (hasFlags) { %>
+              <div class="site-badges position-relative" style="z-index: 2;">
+                <% if (s.cloudflare_mode) { %><span class="badge bg-orange-lt" title="Cloudflare-aware"><i class="ti ti-shield-check me-1"></i>CF</span><% } %>
+                <% if (s.failure_threshold > 1) { %><span class="badge bg-yellow-lt" title="<%= s.failure_threshold %> consecutive failures before alert">N=<%= s.failure_threshold %></span><% } %>
+                <% if (s.paused) { %><span class="badge bg-secondary-lt"><i class="ti ti-player-pause me-1"></i>paused</span><% } %>
+              </div>
+            <% } %>
+
+            <div class="site-stats">
+              <div class="stat">
+                <div class="stat-label">24h uptime</div>
+                <div class="stat-value <%= uptimeColor %>" data-role="uptime">
+                  <%= uptimePct == null ? '--' : uptimePct.toFixed(1) + '%' %>
+                </div>
+              </div>
+              <div class="stat">
+                <div class="stat-label">Last response</div>
+                <div class="stat-value" data-role="last-rt">
+                  <% if (s.last_check && s.last_check.response_time_ms != null) { %>
+                    <%= s.last_check.response_time_ms %><span class="stat-unit">ms</span>
+                  <% } else if (s.monitor_type === 'heartbeat' && s.last_heartbeat_at) { %>
+                    <span class="text-secondary fs-6 fw-normal">ping</span>
+                  <% } else { %>
+                    <span class="text-secondary">--</span>
+                  <% } %>
+                </div>
+              </div>
+            </div>
+
+            <div class="site-footer-time" data-role="last-checked"
+                 data-checked-at="<%= s.last_check ? s.last_check.checked_at : '' %>"
+                 data-heartbeat-at="<%= s.last_heartbeat_at || '' %>"
+                 data-monitor-type="<%= s.monitor_type %>">
+              <i class="ti ti-clock"></i>
+              <% if (s.monitor_type === 'heartbeat') { %>
+                <%= s.last_heartbeat_at ? 'last ping ' + new Date(s.last_heartbeat_at).toLocaleString() : 'no pings yet' %>
+              <% } else if (s.last_check) { %>
+                <%= new Date(s.last_check.checked_at).toLocaleString() %>
+              <% } else { %>
+                no checks yet
+              <% } %>
+            </div>
+          </div>
+        </div>
+      </div>
+    <% }); %>
+  </div>
+
+  <% if (totalPages > 1) {
+       var winSize = 2;
+       var startPage = Math.max(1, page - winSize);
+       var endPage = Math.min(totalPages, page + winSize);
+       var qsBase = qsExceptPage ? qsExceptPage + '&' : '';
+       function pageHref(p) { return '/?' + qsBase + 'page=' + p; }
+       var rangeFrom = (page - 1) * pageSize + 1;
+       var rangeTo = Math.min(total, page * pageSize);
+  %>
+    <div class="d-flex flex-wrap align-items-center justify-content-between mt-3 pagination-bar">
+      <div class="text-secondary small">
+        Showing <strong><%= rangeFrom %></strong>-<strong><%= rangeTo %></strong> of <strong><%= total %></strong>
+      </div>
+      <ul class="pagination m-0">
+        <li class="page-item <%= page === 1 ? 'disabled' : '' %>">
+          <a class="page-link" href="<%= page === 1 ? '#' : pageHref(page - 1) %>">
+            <i class="ti ti-chevron-left"></i>
+          </a>
+        </li>
+        <% if (startPage > 1) { %>
+          <li class="page-item"><a class="page-link" href="<%= pageHref(1) %>">1</a></li>
+          <% if (startPage > 2) { %><li class="page-item disabled"><span class="page-link">...</span></li><% } %>
+        <% } %>
+        <% for (var p = startPage; p <= endPage; p++) { %>
+          <li class="page-item <%= p === page ? 'active' : '' %>">
+            <a class="page-link" href="<%= pageHref(p) %>"><%= p %></a>
+          </li>
+        <% } %>
+        <% if (endPage < totalPages) { %>
+          <% if (endPage < totalPages - 1) { %><li class="page-item disabled"><span class="page-link">...</span></li><% } %>
+          <li class="page-item"><a class="page-link" href="<%= pageHref(totalPages) %>"><%= totalPages %></a></li>
+        <% } %>
+        <li class="page-item <%= page === totalPages ? 'disabled' : '' %>">
+          <a class="page-link" href="<%= page === totalPages ? '#' : pageHref(page + 1) %>">
+            <i class="ti ti-chevron-right"></i>
+          </a>
+        </li>
+      </ul>
+    </div>
+  <% } %>
+<% } %>
+
+<div class="modal" id="confirm-delete-card">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Delete monitor?</h5>
+        <button type="button" class="btn-close" data-modal-close aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        This permanently removes <strong id="confirm-delete-name">this monitor</strong>
+        and all its checks and incidents. This cannot be undone.
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-link" data-modal-close>Cancel</button>
+        <form method="post" id="confirm-delete-form" action="#" class="d-inline">
+          <button type="submit" class="btn btn-danger">
+            <i class="ti ti-trash me-1"></i> Yes, delete
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/dashboard.js"></script>

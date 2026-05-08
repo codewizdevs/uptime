@@ -1,0 +1,239 @@
+<div class="page-header d-print-none">
+  <div class="row g-2 align-items-center">
+    <div class="col">
+      <div class="page-pretitle">
+        <a href="/" class="text-secondary text-decoration-none">
+          <i class="ti ti-arrow-left me-1"></i> Back
+        </a>
+      </div>
+      <h2 class="page-title d-flex align-items-center gap-2">
+        <span class="status-indicator status-<%= site.paused ? 'secondary' : (site.current_state === 'down' ? 'red' : (site.current_state === 'up' ? 'green' : 'muted')) %> status-indicator-animated">
+          <span class="status-indicator-circle"></span>
+          <span class="status-indicator-circle"></span>
+          <span class="status-indicator-circle"></span>
+        </span>
+        <span><%= site.name %></span>
+        <% if (site.cloudflare_mode) { %>
+          <span class="badge bg-orange-lt">CF</span>
+        <% } %>
+        <% if (site.paused) { %>
+          <span class="badge bg-secondary-lt">paused</span>
+        <% } %>
+      </h2>
+      <% if (site.monitor_type === 'active') { %>
+        <div class="text-secondary text-truncate"><a href="<%= site.url %>" target="_blank" rel="noopener" class="text-secondary"><%= site.url %></a></div>
+      <% } %>
+    </div>
+    <div class="col-auto d-flex gap-2">
+      <form method="post" action="/sites/<%= site.id %>/check-now" class="d-inline">
+        <button type="submit" class="btn btn-outline-primary"><i class="ti ti-refresh me-1"></i> Check now</button>
+      </form>
+      <form method="post" action="/sites/<%= site.id %>/pause" class="d-inline">
+        <button type="submit" class="btn btn-outline-secondary">
+          <i class="ti ti-<%= site.paused ? 'player-play' : 'player-pause' %> me-1"></i>
+          <%= site.paused ? 'Resume' : 'Pause' %>
+        </button>
+      </form>
+      <a href="/sites/<%= site.id %>/edit" class="btn btn-primary"><i class="ti ti-edit me-1"></i> Edit</a>
+    </div>
+  </div>
+</div>
+
+<% if (typeof attachedChannels !== 'undefined' && attachedChannels.length > 0) { %>
+  <div class="card mb-3 attached-channels-card">
+    <div class="card-body py-2">
+      <div class="d-flex align-items-center flex-wrap gap-2">
+        <span class="text-secondary small me-1"><i class="ti ti-bell me-1"></i> Notifies:</span>
+        <% attachedChannels.forEach(function(c) { %>
+          <a href="/channels/<%= c.id %>/edit" class="badge bg-<%= c.type === 'discord' ? 'indigo' : c.type === 'webhook' ? 'cyan' : 'blue' %>-lt text-decoration-none">
+            <% if (c.type === 'discord') { %><i class="ti ti-brand-discord me-1"></i><% } %>
+            <% if (c.type === 'webhook') { %><i class="ti ti-webhook me-1"></i><% } %>
+            <% if (c.type === 'email') { %><i class="ti ti-mail me-1"></i><% } %>
+            <%= c.name %>
+          </a>
+        <% }); %>
+        <a href="/sites/<%= site.id %>/edit#channels" class="text-secondary small ms-auto text-decoration-none">
+          <i class="ti ti-edit me-1"></i> change
+        </a>
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<% if (site.monitor_type === 'heartbeat' && site.heartbeat_token) { %>
+  <div class="card mb-3 heartbeat-panel">
+    <div class="card-body">
+      <div class="row align-items-center g-2">
+        <div class="col-md-7">
+          <div class="text-secondary small mb-1"><i class="ti ti-heartbeat me-1"></i> Heartbeat ping URL</div>
+          <div class="input-group">
+            <input type="text" class="form-control font-monospace" id="ping-url" readonly value="<%= publicBaseUrl %>/ping/<%= site.heartbeat_token %>">
+            <button type="button" class="btn" data-copy="#ping-url"><i class="ti ti-copy"></i> Copy</button>
+          </div>
+          <div class="form-hint mt-2">
+            Have your service <code>GET</code> this URL every <strong><%= site.interval_seconds %>s</strong> (grace <%= site.heartbeat_grace_seconds %>s).
+          </div>
+        </div>
+        <div class="col-md-5">
+          <div class="text-secondary small mb-1">Cron one-liner</div>
+          <pre class="bg-body-tertiary p-2 small mb-0" style="white-space: pre-wrap;">* * * * * curl -fsS <%= publicBaseUrl %>/ping/<%= site.heartbeat_token %> > /dev/null</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<div class="row row-cards mb-3">
+  <div class="col-sm-6 col-lg-3">
+    <div class="card"><div class="card-body">
+      <div class="subheader">Uptime - 24h</div>
+      <div class="h1 mb-0"><%= up24 == null ? '-' : up24.toFixed(2) + '%' %></div>
+    </div></div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card"><div class="card-body">
+      <div class="subheader">Uptime - 7d</div>
+      <div class="h1 mb-0"><%= up7 == null ? '-' : up7.toFixed(2) + '%' %></div>
+    </div></div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card"><div class="card-body">
+      <div class="subheader">Uptime - 30d</div>
+      <div class="h1 mb-0"><%= up30 == null ? '-' : up30.toFixed(2) + '%' %></div>
+    </div></div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card"><div class="card-body">
+      <div class="subheader">Downtime - 24h</div>
+      <div class="h1 mb-0"><%= Math.floor(downtime24 / 60) %><span class="h3 text-secondary"> min</span></div>
+    </div></div>
+  </div>
+</div>
+
+<% if (site.monitor_type === 'active' && rt24) { %>
+  <div class="row row-cards mb-3">
+    <div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body">
+      <div class="subheader">Avg response - 24h</div>
+      <div class="h2 mb-0"><%= rt24.avg %><span class="h4 text-secondary"> ms</span></div>
+    </div></div></div>
+    <div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body">
+      <div class="subheader">P95 - 24h</div>
+      <div class="h2 mb-0"><%= rt24.p95 %><span class="h4 text-secondary"> ms</span></div>
+    </div></div></div>
+    <div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body">
+      <div class="subheader">Min - 24h</div>
+      <div class="h2 mb-0"><%= rt24.min %><span class="h4 text-secondary"> ms</span></div>
+    </div></div></div>
+    <div class="col-sm-6 col-lg-3"><div class="card"><div class="card-body">
+      <div class="subheader">Max - 24h</div>
+      <div class="h2 mb-0"><%= rt24.max %><span class="h4 text-secondary"> ms</span></div>
+    </div></div></div>
+  </div>
+<% } %>
+
+<% if (site.monitor_type === 'active') { %>
+  <div class="card mb-3">
+    <div class="card-header d-flex align-items-center">
+      <h3 class="card-title mb-0">Response time</h3>
+      <div class="ms-auto btn-group btn-group-sm" role="group">
+        <button type="button" class="btn btn-outline-secondary range-btn active" data-hours="24">24h</button>
+        <button type="button" class="btn btn-outline-secondary range-btn" data-hours="168">7d</button>
+        <button type="button" class="btn btn-outline-secondary range-btn" data-hours="720">30d</button>
+      </div>
+    </div>
+    <div class="card-body" style="height: 300px;">
+      <canvas id="rt-chart"></canvas>
+    </div>
+  </div>
+<% } %>
+
+<div class="row row-cards">
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">Recent checks</h3></div>
+      <div class="table-responsive">
+        <table class="table table-vcenter table-sm card-table">
+          <thead><tr>
+            <th>When</th><th>State</th><th>HTTP</th><th>RT</th><th>Note</th>
+          </tr></thead>
+          <tbody>
+            <% if (recent.length === 0) { %>
+              <tr><td colspan="5" class="text-center text-secondary py-3">No checks yet</td></tr>
+            <% } %>
+            <% recent.forEach(function(c) { %>
+              <tr>
+                <td class="text-secondary small text-nowrap"><%= new Date(c.checked_at).toLocaleString() %></td>
+                <td>
+                  <% if (c.is_up === 1) { %>
+                    <span class="badge bg-success-lt">up</span>
+                  <% } else if (c.is_up === 0) { %>
+                    <span class="badge bg-danger-lt">down</span>
+                  <% } else { %>
+                    <span class="badge bg-warning-lt" title="Cloudflare or other inconclusive">inconclusive</span>
+                  <% } %>
+                </td>
+                <td class="small"><%= c.status_code ?? '-' %></td>
+                <td class="small"><%= c.response_time_ms != null ? c.response_time_ms + 'ms' : '-' %></td>
+                <td class="small text-secondary text-truncate" style="max-width: 250px;" title="<%= c.error_message || '' %>"><%= c.error_message || '' %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">Incidents</h3></div>
+      <div class="table-responsive">
+        <table class="table table-vcenter table-sm card-table">
+          <thead><tr>
+            <th>Started</th><th>Ended</th><th>Duration</th><th>Reason</th>
+          </tr></thead>
+          <tbody>
+            <% if (incidents.length === 0) { %>
+              <tr><td colspan="4" class="text-center text-secondary py-3">No incidents recorded - nice!</td></tr>
+            <% } %>
+            <% incidents.forEach(function(i) { %>
+              <tr>
+                <td class="text-secondary small text-nowrap"><%= new Date(i.started_at).toLocaleString() %></td>
+                <td class="text-secondary small text-nowrap">
+                  <% if (i.ended_at) { %>
+                    <%= new Date(i.ended_at).toLocaleString() %>
+                  <% } else { %>
+                    <span class="badge bg-danger">ongoing</span>
+                  <% } %>
+                </td>
+                <td class="small">
+                  <% if (i.duration_seconds != null) { %>
+                    <%
+                      var d = i.duration_seconds;
+                      var h = Math.floor(d / 3600);
+                      var m = Math.floor((d % 3600) / 60);
+                      var s = d % 60;
+                      var parts = [];
+                      if (h) parts.push(h + 'h');
+                      if (m) parts.push(m + 'm');
+                      if (!h) parts.push(s + 's');
+                    %>
+                    <%= parts.join(' ') %>
+                  <% } else { %>
+                    -
+                  <% } %>
+                </td>
+                <td class="small text-secondary text-truncate" style="max-width: 250px;" title="<%= i.last_error || '' %>"><%= i.last_error || '' %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<% if (site.monitor_type === 'active') { %>
+  <script>window.__siteId = <%= site.id %>;</script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="/static/js/site-detail.js"></script>
+<% } %>
