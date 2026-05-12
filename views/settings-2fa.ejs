@@ -1,0 +1,115 @@
+<div class="page-header d-print-none mb-3">
+  <div class="row g-2 align-items-center">
+    <div class="col">
+      <h2 class="page-title">Two-factor authentication</h2>
+      <div class="text-secondary mt-1 small">
+        Time-based one-time passwords (TOTP). Works with Aegis, Google Authenticator, 1Password, Bitwarden, Authy, etc.
+      </div>
+    </div>
+  </div>
+</div>
+
+<% if (newRecoveryCodes && newRecoveryCodes.length) { %>
+  <div class="alert alert-success mb-3">
+    <div class="fw-medium mb-1"><i class="ti ti-key me-1"></i> Save these recovery codes</div>
+    <div class="small text-secondary mb-2">
+      Each code works exactly once and replaces a TOTP code. This list will not be shown again — store it somewhere safe (password manager).
+    </div>
+    <div class="row row-cols-2 row-cols-md-5 g-2 font-monospace fs-3">
+      <% newRecoveryCodes.forEach(function(c) { %>
+        <div class="col"><span class="badge bg-success-lt w-100"><%= c %></span></div>
+      <% }); %>
+    </div>
+  </div>
+<% } %>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">
+          Status:
+          <% if (enabled) { %><span class="badge bg-success ms-2">Enabled</span>
+          <% } else if (pending) { %><span class="badge bg-warning ms-2">Pending verification</span>
+          <% } else { %><span class="badge bg-secondary ms-2">Disabled</span><% } %>
+        </h3>
+      </div>
+
+      <% if (enabled) { %>
+        <div class="card-body">
+          <p>Two-factor is currently <strong>enabled</strong>. You have <strong><%= recoveryRemaining %></strong> recovery code<%= recoveryRemaining === 1 ? '' : 's' %> remaining.</p>
+
+          <form method="post" action="/settings/2fa/regenerate-recovery" class="mt-3">
+            <label class="form-label">Regenerate recovery codes</label>
+            <div class="input-group">
+              <input type="text" name="code" class="form-control font-monospace" placeholder="6-digit TOTP" required maxlength="6" pattern="[0-9]*" inputmode="numeric">
+              <button type="submit" class="btn btn-outline-warning">
+                <i class="ti ti-refresh me-1"></i> Regenerate
+              </button>
+            </div>
+            <div class="form-hint">Old recovery codes will be invalidated immediately.</div>
+          </form>
+
+          <hr>
+          <form method="post" action="/settings/2fa/disable">
+            <label class="form-label">Disable two-factor</label>
+            <div class="input-group">
+              <input type="text" name="code" class="form-control font-monospace" placeholder="TOTP or recovery code" required>
+              <button type="submit" class="btn btn-outline-danger"
+                      onclick="return confirm('Disable 2FA? Your account will be protected by password only.');">
+                <i class="ti ti-shield-off me-1"></i> Disable
+              </button>
+            </div>
+          </form>
+        </div>
+      <% } else if (pending) { %>
+        <div class="card-body">
+          <ol class="mb-3">
+            <li class="mb-2">Scan the QR code in your authenticator app, or manually paste the secret:
+              <code class="user-select-all"><%= pending.secret %></code>
+            </li>
+            <li>Enter the 6-digit code your app shows to confirm.</li>
+          </ol>
+          <div class="text-center mb-3">
+            <img src="<%= pending.qrDataUrl %>" alt="2FA QR code" class="rounded shadow-sm" style="background: #fff; padding: 8px;">
+          </div>
+          <form method="post" action="/settings/2fa/enable">
+            <div class="input-group">
+              <input type="text" name="code" class="form-control form-control-lg font-monospace text-center" placeholder="123 456"
+                     required maxlength="6" pattern="[0-9]*" inputmode="numeric" autofocus>
+              <button type="submit" class="btn btn-primary">
+                <i class="ti ti-check me-1"></i> Confirm &amp; enable
+              </button>
+            </div>
+          </form>
+          <form method="post" action="/settings/2fa/cancel" class="mt-2 text-end">
+            <button type="submit" class="btn btn-link text-secondary">Cancel enrollment</button>
+          </form>
+        </div>
+      <% } else { %>
+        <div class="card-body">
+          <p>Two-factor is currently disabled. Enable it to require a second factor on every sign-in.</p>
+          <form method="post" action="/settings/2fa/start">
+            <button type="submit" class="btn btn-primary">
+              <i class="ti ti-shield-lock me-1"></i> Enable two-factor
+            </button>
+          </form>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">How it works</h3></div>
+      <div class="card-body small">
+        <ul class="mb-0">
+          <li>Codes refresh every 30 seconds; we accept the previous code as well (window=1).</li>
+          <li>Login is rate-limited per IP (5 failures / 15 min) and per username (10 failures / 30 min).</li>
+          <li>Recovery codes work exactly once each, and are hashed at rest.</li>
+          <li>API tokens authenticate independently and are <strong>not</strong> blocked by 2FA — guard them like credentials.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>

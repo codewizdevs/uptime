@@ -1,0 +1,124 @@
+<div class="page-header d-print-none mb-3">
+  <div class="row g-2 align-items-center">
+    <div class="col">
+      <h2 class="page-title">API tokens</h2>
+      <div class="text-secondary mt-1 small">
+        Use these tokens to authenticate REST API calls and to scrape the Prometheus <code>/metrics</code> endpoint.
+      </div>
+    </div>
+  </div>
+</div>
+
+<% if (newToken) { %>
+  <div class="alert alert-success">
+    <div class="d-flex align-items-start">
+      <i class="ti ti-key fs-2 me-2"></i>
+      <div class="flex-fill">
+        <div class="fw-medium mb-1">New token "<%= newToken.name %>" (<%= newToken.scope %>) — copy it now</div>
+        <div class="text-secondary small mb-2">This is the only time we will show this value. Store it in a secure place.</div>
+        <div class="input-group">
+          <input type="text" class="form-control font-monospace" id="new-token-value" readonly value="<%= newToken.token %>">
+          <button type="button" class="btn btn-success" data-copy="#new-token-value"><i class="ti ti-copy me-1"></i>Copy</button>
+        </div>
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<div class="row g-3">
+  <div class="col-md-4">
+    <form method="post" action="/settings/api-tokens" class="card">
+      <div class="card-header">
+        <h3 class="card-title">New token</h3>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label required">Name</label>
+          <input type="text" name="name" class="form-control" required maxlength="160" placeholder="prometheus-scrape, deploy-bot, …">
+        </div>
+        <div>
+          <label class="form-label">Scope</label>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="scope" id="scope-read" value="read" checked>
+            <label class="form-check-label" for="scope-read">
+              <strong>Read</strong> — list/read sites, checks, incidents, metrics
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="scope" id="scope-write" value="write">
+            <label class="form-check-label" for="scope-write">
+              <strong>Write</strong> — also pause/resume/delete monitors and run checks
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="card-footer text-end">
+        <button type="submit" class="btn btn-primary">Generate token</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Existing tokens (<%= tokens.length %>)</h3>
+      </div>
+      <% if (!tokens.length) { %>
+        <div class="card-body">
+          <div class="empty">
+            <p class="empty-title">No tokens yet</p>
+            <p class="empty-subtitle text-secondary">Create your first API token on the left to start using the REST API and Prometheus metrics.</p>
+          </div>
+        </div>
+      <% } else { %>
+        <div class="table-responsive">
+          <table class="table table-vcenter">
+            <thead><tr><th>Name</th><th>Scope</th><th>Last used</th><th>Created</th><th class="w-1"></th></tr></thead>
+            <tbody>
+              <% tokens.forEach(function(t) { %>
+                <tr>
+                  <td><%= t.name %></td>
+                  <td>
+                    <span class="badge bg-<%= t.scope === 'write' ? 'red' : 'blue' %>-lt"><%= t.scope %></span>
+                  </td>
+                  <td class="text-secondary small"><%= t.last_used_at ? new Date(t.last_used_at).toLocaleString() : 'never' %></td>
+                  <td class="text-secondary small"><%= new Date(t.created_at).toLocaleString() %></td>
+                  <td class="text-end">
+                    <form method="post" action="/settings/api-tokens/<%= t.id %>/delete" class="m-0"
+                          onsubmit="return confirm('Revoke token &quot;<%= t.name %>&quot;? Any client using it will be denied immediately.');">
+                      <button type="submit" class="btn btn-sm btn-link text-danger"><i class="ti ti-trash"></i></button>
+                    </form>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+
+    <div class="card mt-3">
+      <div class="card-header"><h3 class="card-title">Quick examples</h3></div>
+      <div class="card-body">
+        <div class="mb-3">
+          <div class="text-secondary small mb-1">List monitors (read)</div>
+          <pre class="bg-body-tertiary p-2 small mb-0" style="white-space: pre-wrap;">curl -H 'Authorization: Bearer &lt;token&gt;' <%= publicBaseUrl %>/api/v1/sites</pre>
+        </div>
+        <div class="mb-3">
+          <div class="text-secondary small mb-1">Pause a monitor (write)</div>
+          <pre class="bg-body-tertiary p-2 small mb-0" style="white-space: pre-wrap;">curl -X POST -H 'Authorization: Bearer &lt;token&gt;' <%= publicBaseUrl %>/api/v1/sites/123/pause</pre>
+        </div>
+        <div>
+          <div class="text-secondary small mb-1">Prometheus scrape</div>
+          <pre class="bg-body-tertiary p-2 small mb-0" style="white-space: pre-wrap;">scrape_configs:
+  - job_name: uptime
+    metrics_path: /metrics
+    authorization:
+      credentials: &lt;token&gt;
+    static_configs:
+      - targets: ['<%= (publicBaseUrl || '').replace(/^https?:\/\//, '') %>']</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

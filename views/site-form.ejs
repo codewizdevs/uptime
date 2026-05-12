@@ -22,14 +22,18 @@
       <div class="col-md-6">
         <label class="form-label required">Monitor type</label>
         <select name="monitor_type" id="monitor_type" class="form-select">
-          <option value="active" <%= site.monitor_type === 'active' ? 'selected' : '' %>>Active - we ping the URL</option>
+          <option value="active"    <%= site.monitor_type === 'active'    ? 'selected' : '' %>>Active - we ping the URL (HTTP/HTTPS)</option>
           <option value="heartbeat" <%= site.monitor_type === 'heartbeat' ? 'selected' : '' %>>Heartbeat - the service pings us</option>
+          <option value="cert"      <%= site.monitor_type === 'cert'      ? 'selected' : '' %>>Certificate - TLS handshake only (no HTTP)</option>
+          <option value="tcp"       <%= site.monitor_type === 'tcp'       ? 'selected' : '' %>>TCP - open a socket to host:port</option>
+          <option value="ping"      <%= site.monitor_type === 'ping'      ? 'selected' : '' %>>Ping - ICMP echo</option>
+          <option value="dns"       <%= site.monitor_type === 'dns'       ? 'selected' : '' %>>DNS - resolve and match record</option>
         </select>
       </div>
     </div>
   </div>
 
-  <div class="card-body border-top" data-section="active" <%= site.monitor_type === 'heartbeat' ? 'hidden' : '' %>>
+  <div class="card-body border-top" data-section="active" <%= (site.monitor_type && site.monitor_type !== 'active') ? 'hidden' : '' %>>
     <h3 class="card-title">HTTP probe</h3>
     <div class="row g-3">
       <div class="col-md-9">
@@ -67,7 +71,8 @@
         <select name="check_type" id="check_type" class="form-select">
           <option value="status" <%= (site.check_type || 'status') === 'status' ? 'selected' : '' %>>HTTP status</option>
           <option value="string" <%= site.check_type === 'string' ? 'selected' : '' %>>Body contains string</option>
-          <option value="json" <%= site.check_type === 'json' ? 'selected' : '' %>>JSON path equals value</option>
+          <option value="regex"  <%= site.check_type === 'regex'  ? 'selected' : '' %>>Body matches regex</option>
+          <option value="json"   <%= site.check_type === 'json'   ? 'selected' : '' %>>JSON path equals value</option>
         </select>
       </div>
       <div class="col-md-9" data-check="status" <%= (site.check_type && site.check_type !== 'status') ? 'hidden' : '' %>>
@@ -76,7 +81,14 @@
       </div>
       <div class="col-md-9" data-check="string" <%= site.check_type !== 'string' ? 'hidden' : '' %>>
         <label class="form-label">Expected substring (case sensitive)</label>
-        <input type="text" name="expected_string" class="form-control" value="<%= site.expected_string || '' %>" placeholder="OK">
+        <input type="text" name="expected_string" class="form-control" value="<%= site.check_type === 'string' ? (site.expected_string || '') : '' %>" placeholder="OK">
+      </div>
+      <div class="col-md-9" data-check="regex" <%= site.check_type !== 'regex' ? 'hidden' : '' %>>
+        <label class="form-label">Body regex</label>
+        <input type="text" name="expected_string_regex" class="form-control"
+               value="<%= site.check_type === 'regex' ? (site.expected_string || '') : '' %>"
+               placeholder="/version: \\d+\\.\\d+/i or healthy" data-mirror="expected_string">
+        <div class="form-hint">Bare patterns are matched case-insensitively. Use <code>/pattern/flags</code> for full control (e.g. <code>/OK/i</code>, <code>/up|ready/</code>).</div>
       </div>
       <div class="col-md-9" data-check="json" <%= site.check_type !== 'json' ? 'hidden' : '' %>>
         <div class="row g-2">
@@ -106,39 +118,372 @@
         <textarea name="request_headers" class="form-control font-monospace" rows="4" placeholder='{"X-API-Key": "...", "CF-Access-Client-Id": "..."}'><%= site.request_headers_str || '' %></textarea>
       </div>
     </div>
+
+    <h4 class="card-title mt-4">Request body</h4>
+    <div class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label">Body type</label>
+        <select name="request_body_type" class="form-select">
+          <option value="text" <%= (site.request_body_type || 'text') === 'text' ? 'selected' : '' %>>text/plain</option>
+          <option value="json" <%= site.request_body_type === 'json' ? 'selected' : '' %>>application/json</option>
+          <option value="form" <%= site.request_body_type === 'form' ? 'selected' : '' %>>application/x-www-form-urlencoded</option>
+        </select>
+        <div class="form-hint">Used only for POST/PUT/PATCH/DELETE.</div>
+      </div>
+      <div class="col-md-9">
+        <label class="form-label">Request body (optional)</label>
+        <textarea name="request_body" class="form-control font-monospace" rows="4"
+                  placeholder='{"hello": "world"}'><%= site.request_body || '' %></textarea>
+      </div>
+    </div>
+
+    <h4 class="card-title mt-4">Authentication</h4>
+    <div class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label">Auth type</label>
+        <select name="auth_type" id="auth-type" class="form-select">
+          <option value="none"   <%= (site.auth_type || 'none') === 'none' ? 'selected' : '' %>>None</option>
+          <option value="basic"  <%= site.auth_type === 'basic'  ? 'selected' : '' %>>HTTP Basic</option>
+          <option value="bearer" <%= site.auth_type === 'bearer' ? 'selected' : '' %>>Bearer token</option>
+        </select>
+      </div>
+      <div class="col-md-9">
+        <div class="row g-2" data-auth="basic" <%= site.auth_type === 'basic' ? '' : 'hidden' %>>
+          <div class="col-md-6">
+            <label class="form-label">Username</label>
+            <input type="text" name="auth_username" class="form-control" autocomplete="off"
+                   value="<%= site.auth_username || '' %>">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Password</label>
+            <input type="password" name="auth_password" class="form-control" autocomplete="new-password"
+                   value="<%= site.auth_password || '' %>">
+          </div>
+        </div>
+        <div data-auth="bearer" <%= site.auth_type === 'bearer' ? '' : 'hidden' %>>
+          <label class="form-label">Bearer token</label>
+          <input type="text" name="auth_token" class="form-control font-monospace" autocomplete="off"
+                 placeholder="eyJ…" value="<%= site.auth_token || '' %>">
+          <div class="form-hint">Sent as <code>Authorization: Bearer &lt;token&gt;</code>.</div>
+        </div>
+      </div>
+    </div>
+
+    <h4 class="card-title mt-4">Network &amp; TLS</h4>
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label">Follow redirects</label>
+        <select name="follow_redirects" class="form-select">
+          <option value="1" <%= (site.follow_redirects == null ? 1 : site.follow_redirects) ? 'selected' : '' %>>Yes (up to 5 hops)</option>
+          <option value="0" <%= (site.follow_redirects == null ? 1 : site.follow_redirects) ? '' : 'selected' %>>No</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">TLS verification</label>
+        <select name="skip_tls_verify" class="form-select">
+          <option value="0" <%= site.skip_tls_verify ? '' : 'selected' %>>Strict (recommended)</option>
+          <option value="1" <%= site.skip_tls_verify ? 'selected' : '' %>>Skip — accept any cert</option>
+        </select>
+        <div class="form-hint">Only relax for self-signed test environments.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Max response time (ms, optional)</label>
+        <input type="number" name="max_response_time_ms" class="form-control" min="0" max="600000"
+               value="<%= site.max_response_time_ms || '' %>" placeholder="e.g. 500">
+        <div class="form-hint">Mark DOWN if a response exceeds this, even on 200.</div>
+      </div>
+    </div>
+    <script>
+    (function() {
+      var sel = document.getElementById('auth-type');
+      if (!sel) return;
+      function sync() {
+        var v = sel.value;
+        document.querySelectorAll('[data-auth]').forEach(function(el) {
+          el.hidden = el.getAttribute('data-auth') !== v;
+        });
+      }
+      sel.addEventListener('change', sync);
+      sync();
+    })();
+    </script>
+
+    <h4 class="card-title mt-4">TLS certificate alerts</h4>
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label">Warn when cert expires within (days)</label>
+        <input type="number" name="cert_expiry_warn_days" class="form-control" min="0" max="365"
+               value="<%= site.cert_expiry_warn_days == null ? 14 : site.cert_expiry_warn_days %>">
+        <div class="form-hint">For HTTPS URLs only. Set to 0 to disable cert expiry alerts.</div>
+      </div>
+      <% if (site.last_cert_valid_to) { %>
+        <div class="col-md-8">
+          <div class="alert alert-secondary mb-0 small">
+            Latest cert seen: <strong><%= site.last_cert_subject || '?' %></strong>
+            issued by <strong><%= site.last_cert_issuer || '?' %></strong>,
+            expires <strong><%= site.last_cert_valid_to %></strong>
+            (<strong><%= site.last_cert_days_remaining %> days</strong> remaining).
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="card-body border-top" data-section="cert" <%= site.monitor_type !== 'cert' ? 'hidden' : '' %>>
+    <h3 class="card-title">TLS certificate monitor</h3>
+    <p class="card-subtitle text-secondary mb-3">Opens a TLS handshake against host:port and reports cert health. No HTTP request is made — useful for SMTPS / IMAPS / FTPS / custom ports.</p>
+    <div class="row g-3">
+      <div class="col-md-8">
+        <label class="form-label required">Host</label>
+        <input type="text" name="cert_host" class="form-control" value="<%= site.cert_host || '' %>" placeholder="example.com">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Port</label>
+        <input type="number" name="cert_port" class="form-control" min="1" max="65535"
+               value="<%= site.cert_port || 443 %>">
+        <div class="form-hint">443 (HTTPS), 465 (SMTPS), 993 (IMAPS), 995 (POP3S), etc.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Interval (seconds)</label>
+        <input type="number" name="interval_seconds_cert" class="form-control" min="60" value="<%= site.monitor_type === 'cert' ? site.interval_seconds : 3600 %>" data-mirror="interval_seconds">
+        <div class="form-hint">Certs change rarely — once an hour is fine.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Warn when cert expires within (days)</label>
+        <input type="number" name="cert_expiry_warn_days_cert" class="form-control" min="0" max="365"
+               value="<%= site.cert_expiry_warn_days == null ? 14 : site.cert_expiry_warn_days %>" data-mirror="cert_expiry_warn_days">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Failure threshold</label>
+        <input type="number" name="failure_threshold_cert" class="form-control" min="1" value="<%= site.failure_threshold || 1 %>" data-mirror="failure_threshold">
+      </div>
+    </div>
+  </div>
+
+  <div class="card-body border-top" data-section="tcp" <%= site.monitor_type !== 'tcp' ? 'hidden' : '' %>>
+    <h3 class="card-title">TCP probe</h3>
+    <p class="card-subtitle text-secondary mb-3">Opens a raw TCP connection to host:port. Optionally waits for a banner substring (SSH/SMTP/IMAP/etc.).</p>
+    <div class="row g-3">
+      <div class="col-md-8">
+        <label class="form-label required">Host</label>
+        <input type="text" name="tcp_host" class="form-control" value="<%= site.tcp_host || '' %>" placeholder="db.internal">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label required">Port</label>
+        <input type="number" name="tcp_port" class="form-control" min="1" max="65535"
+               value="<%= site.tcp_port || '' %>" placeholder="22">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Interval (seconds)</label>
+        <input type="number" name="interval_seconds_tcp" class="form-control" min="10"
+               value="<%= site.monitor_type === 'tcp' ? site.interval_seconds : 60 %>" data-mirror="interval_seconds">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Timeout (ms)</label>
+        <input type="number" name="timeout_ms_tcp" class="form-control" min="500"
+               value="<%= site.monitor_type === 'tcp' ? site.timeout_ms : 5000 %>" data-mirror="timeout_ms">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Failure threshold</label>
+        <input type="number" name="failure_threshold_tcp" class="form-control" min="1"
+               value="<%= site.failure_threshold || 1 %>" data-mirror="failure_threshold">
+      </div>
+      <div class="col-12">
+        <label class="form-label">Expected banner (optional)</label>
+        <input type="text" name="expected_banner" class="form-control"
+               value="<%= site.monitor_type === 'tcp' ? (site.expected_string || '') : '' %>"
+               placeholder="SSH-2.0 or 220 mail.example.com">
+        <div class="form-hint">If set, the probe waits for the server to send these bytes before declaring success.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-body border-top" data-section="ping" <%= site.monitor_type !== 'ping' ? 'hidden' : '' %>>
+    <h3 class="card-title">ICMP ping</h3>
+    <p class="card-subtitle text-secondary mb-3">Sends ICMP echo packets via the system <code>ping</code> binary. Most useful for routers, switches and LAN hosts.</p>
+    <div class="row g-3">
+      <div class="col-md-8">
+        <label class="form-label required">Host</label>
+        <input type="text" name="ping_host" class="form-control" value="<%= site.ping_host || '' %>" placeholder="192.168.1.1 or gw.internal">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Echo count</label>
+        <input type="number" name="ping_count" class="form-control" min="1" max="10"
+               value="<%= site.ping_count || 1 %>">
+        <div class="form-hint">Number of ICMP packets per check. 1 is fine for liveness; bump to 3-5 for jitter.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Interval (seconds)</label>
+        <input type="number" name="interval_seconds_ping" class="form-control" min="10"
+               value="<%= site.monitor_type === 'ping' ? site.interval_seconds : 60 %>" data-mirror="interval_seconds">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Timeout (ms)</label>
+        <input type="number" name="timeout_ms_ping" class="form-control" min="1000"
+               value="<%= site.monitor_type === 'ping' ? site.timeout_ms : 5000 %>" data-mirror="timeout_ms">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Failure threshold</label>
+        <input type="number" name="failure_threshold_ping" class="form-control" min="1"
+               value="<%= site.failure_threshold || 1 %>" data-mirror="failure_threshold">
+      </div>
+    </div>
+  </div>
+
+  <div class="card-body border-top" data-section="dns" <%= site.monitor_type !== 'dns' ? 'hidden' : '' %>>
+    <h3 class="card-title">DNS record monitor</h3>
+    <p class="card-subtitle text-secondary mb-3">Resolves a record and (optionally) asserts the answer contains a substring or matches a regex.</p>
+    <div class="row g-3">
+      <div class="col-md-7">
+        <label class="form-label required">Name to look up</label>
+        <input type="text" name="dns_query" class="form-control" value="<%= site.dns_query || '' %>" placeholder="example.com">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Record type</label>
+        <select name="dns_record_type" class="form-select">
+          <% ['A','AAAA','CNAME','MX','TXT','NS','SRV','CAA','SOA','PTR'].forEach(function(t) { %>
+            <option value="<%= t %>" <%= (site.dns_record_type || 'A') === t ? 'selected' : '' %>><%= t %></option>
+          <% }); %>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Timeout (ms)</label>
+        <input type="number" name="timeout_ms_dns" class="form-control" min="500"
+               value="<%= site.monitor_type === 'dns' ? site.timeout_ms : 5000 %>" data-mirror="timeout_ms">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Resolver (optional)</label>
+        <input type="text" name="dns_resolver" class="form-control"
+               value="<%= site.dns_resolver || '' %>" placeholder="1.1.1.1 or 1.1.1.1:53">
+        <div class="form-hint">Leave blank to use the system resolvers.</div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Expected match (optional)</label>
+        <input type="text" name="dns_expected" class="form-control"
+               value="<%= site.dns_expected || '' %>" placeholder="1.2.3.4 or /aspmx\\.l\\.google\\.com/i">
+        <div class="form-hint">Plain text = case-insensitive substring. <code>/pattern/flags</code> = regex.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Interval (seconds)</label>
+        <input type="number" name="interval_seconds_dns" class="form-control" min="10"
+               value="<%= site.monitor_type === 'dns' ? site.interval_seconds : 300 %>" data-mirror="interval_seconds">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Failure threshold</label>
+        <input type="number" name="failure_threshold_dns" class="form-control" min="1"
+               value="<%= site.failure_threshold || 1 %>" data-mirror="failure_threshold">
+      </div>
+    </div>
   </div>
 
   <div class="card-body border-top" data-section="heartbeat" <%= site.monitor_type !== 'heartbeat' ? 'hidden' : '' %>>
     <h3 class="card-title">Heartbeat parameters</h3>
     <div class="row g-3">
-      <div class="col-md-4">
+      <div class="col-md-3">
+        <label class="form-label">Schedule type</label>
+        <select name="heartbeat_schedule_kind" id="hb-schedule-kind" class="form-select">
+          <option value="interval" <%= site.heartbeat_schedule_kind !== 'cron' ? 'selected' : '' %>>Interval</option>
+          <option value="cron"     <%= site.heartbeat_schedule_kind === 'cron' ? 'selected' : '' %>>Cron expression</option>
+        </select>
+      </div>
+      <div class="col-md-3" data-hb="interval" <%= site.heartbeat_schedule_kind === 'cron' ? 'hidden' : '' %>>
         <label class="form-label">Expected interval (seconds)</label>
-        <input type="number" name="interval_seconds_hb" class="form-control" min="10" value="<%= site.monitor_type === 'heartbeat' ? site.interval_seconds : 300 %>" data-mirror="interval_seconds">
+        <input type="number" name="interval_seconds_hb" class="form-control" min="10"
+               value="<%= site.monitor_type === 'heartbeat' ? site.interval_seconds : 300 %>" data-mirror="interval_seconds">
         <div class="form-hint">How often the service is expected to ping us.</div>
       </div>
-      <div class="col-md-4">
+      <div class="col-md-6" data-hb="cron" <%= site.heartbeat_schedule_kind === 'cron' ? '' : 'hidden' %>>
+        <div class="row g-2">
+          <div class="col-md-8">
+            <label class="form-label">Cron expression</label>
+            <input type="text" name="heartbeat_cron" class="form-control font-monospace"
+                   value="<%= site.heartbeat_cron || '*/5 * * * *' %>" placeholder="*/5 * * * *">
+            <div class="form-hint">Standard 5-field cron. Pings must arrive at every occurrence.</div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Timezone</label>
+            <input type="text" name="heartbeat_timezone" class="form-control"
+                   value="<%= site.heartbeat_timezone || 'UTC' %>" placeholder="UTC">
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
         <label class="form-label">Grace period (seconds)</label>
         <input type="number" name="heartbeat_grace_seconds" class="form-control" min="5" value="<%= site.heartbeat_grace_seconds || 60 %>">
         <div class="form-hint">Tolerated lateness before flipping DOWN.</div>
       </div>
-      <div class="col-md-4">
+      <div class="col-md-3">
         <label class="form-label">Failure threshold</label>
-        <input type="number" name="failure_threshold_hb" class="form-control" min="1" value="<%= site.failure_threshold || 1 %>" data-mirror="failure_threshold">
+        <input type="number" name="failure_threshold_hb" class="form-control" min="1"
+               value="<%= site.failure_threshold || 1 %>" data-mirror="failure_threshold">
       </div>
+
       <% if (site.heartbeat_token) { %>
         <div class="col-12">
-          <label class="form-label">Ping URL</label>
-          <div class="input-group">
-            <input type="text" class="form-control font-monospace" id="heartbeat-url" readonly value="<%= publicBaseUrl %>/ping/<%= site.heartbeat_token %>">
-            <button type="button" class="btn" data-copy="#heartbeat-url"><i class="ti ti-copy"></i> Copy</button>
+          <label class="form-label">Ping URLs</label>
+          <div class="input-group mb-1">
+            <span class="input-group-text" style="min-width: 5rem;">success</span>
+            <input type="text" class="form-control font-monospace" id="heartbeat-url" readonly
+                   value="<%= publicBaseUrl %>/ping/<%= site.heartbeat_token %>">
+            <button type="button" class="btn" data-copy="#heartbeat-url"><i class="ti ti-copy"></i></button>
           </div>
-          <div class="form-hint">Hit this URL from the service you want to monitor on the chosen interval.</div>
+          <div class="input-group mb-1">
+            <span class="input-group-text" style="min-width: 5rem;">start</span>
+            <input type="text" class="form-control font-monospace" id="heartbeat-url-start" readonly
+                   value="<%= publicBaseUrl %>/ping/<%= site.heartbeat_token %>/start">
+            <button type="button" class="btn" data-copy="#heartbeat-url-start"><i class="ti ti-copy"></i></button>
+          </div>
+          <div class="input-group mb-1">
+            <span class="input-group-text" style="min-width: 5rem;">fail</span>
+            <input type="text" class="form-control font-monospace" id="heartbeat-url-fail" readonly
+                   value="<%= publicBaseUrl %>/ping/<%= site.heartbeat_token %>/fail">
+            <button type="button" class="btn" data-copy="#heartbeat-url-fail"><i class="ti ti-copy"></i></button>
+          </div>
+          <div class="form-hint">
+            Use <code>/start</code> before your job, <code>/0</code> (or root URL) on success, <code>/&lt;rc&gt;</code> with a non-zero exit code on failure.
+            Body payloads up to 4 KB are captured and shown on the detail page.
+          </div>
         </div>
       <% } else { %>
         <div class="col-12">
           <div class="alert alert-info mb-0 small">A unique ping URL will be generated when you save this monitor.</div>
         </div>
       <% } %>
+    </div>
+    <script>
+    (function() {
+      var sel = document.getElementById('hb-schedule-kind');
+      if (!sel) return;
+      function sync() {
+        var v = sel.value;
+        document.querySelectorAll('[data-hb]').forEach(function(el) {
+          el.hidden = el.getAttribute('data-hb') !== v;
+        });
+      }
+      sel.addEventListener('change', sync);
+      sync();
+    })();
+    </script>
+  </div>
+
+  <div class="card-body border-top">
+    <h3 class="card-title">Notes &amp; alert mute</h3>
+    <div class="row g-3">
+      <div class="col-md-8">
+        <label class="form-label">Notes (optional)</label>
+        <textarea name="notes" class="form-control" rows="3" maxlength="16384"
+                  placeholder="Anything useful to operators — runbook URL, owner, dependencies, …"><%= site.notes || '' %></textarea>
+        <div class="form-hint">Shown on the monitor detail page. Plain text, up to 16 KB.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label d-block">Notifications</label>
+        <label class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="mute_notifications" value="1"
+                 <%= site.mute_notifications ? 'checked' : '' %>>
+          <span class="form-check-label">Mute alerts</span>
+        </label>
+        <div class="form-hint">Probe still runs and incidents still open. Useful for noisy monitors during triage.</div>
+      </div>
     </div>
   </div>
 
@@ -162,18 +507,20 @@
               <input type="checkbox" name="channel_ids" value="<%= c.id %>" class="form-selectgroup-input"
                      <%= (typeof selectedChannelIds !== 'undefined' && selectedChannelIds.includes(c.id)) ? 'checked' : '' %>
                      <%= c.enabled ? '' : 'disabled' %>>
+              <% var meta = (typeof CHANNEL_META !== 'undefined' && CHANNEL_META[c.type]) || { label: c.type, icon: 'ti-bell', color: 'secondary' }; %>
               <span class="form-selectgroup-label d-flex align-items-center">
-                <span class="me-2">
-                  <% if (c.type === 'discord') { %><i class="ti ti-brand-discord text-indigo"></i><% } %>
-                  <% if (c.type === 'webhook') { %><i class="ti ti-webhook text-cyan"></i><% } %>
-                  <% if (c.type === 'email') { %><i class="ti ti-mail text-blue"></i><% } %>
-                </span>
+                <span class="me-2"><i class="ti <%= meta.icon %> text-<%= meta.color %>"></i></span>
                 <span class="flex-fill">
                   <span class="d-block fw-medium"><%= c.name %></span>
                   <span class="d-block small text-secondary text-truncate" style="max-width: 240px;">
-                    <% if (c.type === 'discord') { %>discord webhook<% } %>
-                    <% if (c.type === 'webhook') { %><%= c.config.url || '' %><% } %>
-                    <% if (c.type === 'email') { %><%= (c.config.to || []).join(', ') %><% } %>
+                    <% if (c.type === 'discord') { %>discord webhook
+                    <% } else if (c.type === 'webhook') { %><%= c.config.url || '' %>
+                    <% } else if (c.type === 'email') { %><%= (c.config.to || []).join(', ') %>
+                    <% } else if (c.type === 'slack' || c.type === 'mattermost' || c.type === 'teams') { %>incoming webhook
+                    <% } else if (c.type === 'telegram') { %>chat <%= c.config.chat_id || '' %>
+                    <% } else if (c.type === 'ntfy') { %><%= c.config.topic_url || '' %>
+                    <% } else if (c.type === 'gotify') { %><%= c.config.server_url || '' %>
+                    <% } else if (c.type === 'pushover') { %>pushover<% } %>
                   </span>
                 </span>
                 <% if (!c.enabled) { %><span class="badge bg-secondary-lt ms-2">disabled</span><% } %>
@@ -189,6 +536,89 @@
         <span class="form-check-label">Paused</span>
       </label>
       <div class="form-hint">Stops scheduled checks (and accepted heartbeats) without deleting the monitor.</div>
+    </div>
+  </div>
+
+  <div class="card-body border-top">
+    <h3 class="card-title d-flex align-items-center">
+      <span>Tags</span>
+      <a href="/settings/tags" target="_blank" rel="noopener" class="ms-auto small text-secondary text-decoration-none">
+        <i class="ti ti-external-link me-1"></i> Manage tags
+      </a>
+    </h3>
+    <% if (!allTags || !allTags.length) { %>
+      <div class="alert alert-info small mb-0">
+        No tags defined yet. <a href="/settings/tags" class="alert-link">Create a tag</a> to group related monitors.
+      </div>
+    <% } else { %>
+      <div class="form-hint mb-2">Pick one or more tags. Tags are useful as dashboard filters and for bulk actions.</div>
+      <div class="d-flex flex-wrap gap-2">
+        <% allTags.forEach(function(t) { %>
+          <label class="tag-pick">
+            <input type="checkbox" name="tag_ids" value="<%= t.id %>"
+                   <%= (typeof selectedTagIds !== 'undefined' && selectedTagIds.includes(t.id)) ? 'checked' : '' %>>
+            <span class="badge bg-<%= t.color %>-lt"><i class="ti ti-tag me-1"></i><%= t.name %></span>
+          </label>
+        <% }); %>
+      </div>
+    <% } %>
+  </div>
+
+  <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
+    <div class="card-body border-top">
+      <h3 class="card-title">Ownership</h3>
+      <p class="card-subtitle text-secondary mb-3">
+        Owners always have manage permission on their monitors. Non-admin users can only see monitors they own or were granted.
+      </p>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Owner</label>
+          <select name="owner_user_id" class="form-select">
+            <option value="">None (admin-only visibility)</option>
+            <% (allOwners || []).forEach(function(u) { %>
+              <option value="<%= u.id %>" <%= site.owner_user_id === u.id ? 'selected' : '' %>>
+                <%= u.username %><%= u.role !== 'viewer' ? ' (' + u.role + ')' : '' %><%= u.disabled ? ' — disabled' : '' %>
+              </option>
+            <% }); %>
+          </select>
+          <div class="form-hint">
+            Pick the DB user who owns this monitor. Leave as "None" to keep it admin-only.
+          </div>
+        </div>
+      </div>
+    </div>
+  <% } %>
+
+  <div class="card-body border-top">
+    <h3 class="card-title">Public status page</h3>
+    <p class="card-subtitle text-secondary mb-3">Controls how this monitor appears on the read-only <code>/status</code> page.</p>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Display name (optional)</label>
+        <input type="text" name="display_name" class="form-control" maxlength="255"
+               value="<%= site.display_name || '' %>" placeholder="Same as monitor name">
+        <div class="form-hint">Shown publicly instead of the internal name. Leave blank to use the monitor name.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Group</label>
+        <input type="text" name="status_page_group" class="form-control" maxlength="120"
+               value="<%= site.status_page_group || '' %>" placeholder="API, Database, …">
+        <div class="form-hint">Monitors with the same group label are shown together. Leave blank for the default section.</div>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Order</label>
+        <input type="number" name="status_page_order" class="form-control" min="0" step="1"
+               value="<%= site.status_page_order || 0 %>">
+        <div class="form-hint">Smaller numbers appear first.</div>
+      </div>
+      <div class="col-12">
+        <label class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="status_page_excluded" value="1"
+                 <%= site.status_page_excluded ? 'checked' : '' %>>
+          <span class="form-check-label">Hide from public status page</span>
+        </label>
+        <div class="form-hint">Use for internal monitors you don't want to share publicly.</div>
+      </div>
     </div>
   </div>
 
@@ -227,4 +657,4 @@
   </div>
 <% } %>
 
-<script src="/static/js/site-form.js"></script>
+<script src="/static/js/site-form.js?v=<%= assetV %>"></script>

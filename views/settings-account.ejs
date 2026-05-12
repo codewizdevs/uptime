@@ -1,0 +1,237 @@
+<div class="page-header d-print-none mb-3">
+  <div class="row g-2 align-items-center">
+    <div class="col">
+      <h2 class="page-title">My account</h2>
+      <div class="text-secondary mt-1 small">
+        Manage your password, two-factor authentication, and personal API tokens.
+      </div>
+    </div>
+  </div>
+</div>
+
+<% if (isEnv) { %>
+  <div class="alert alert-info">
+    <i class="ti ti-info-circle me-1"></i>
+    You are signed in as the <strong>env super-admin</strong>. Your credentials live in <code>.env</code> and
+    cannot be changed here. Manage the env admin's 2FA at
+    <a href="/settings/2fa" class="alert-link">Settings → Env admin 2FA</a>.
+  </div>
+<% } else { %>
+
+  <% if (myUser && myUser.must_change_password) { %>
+    <div class="alert alert-warning">
+      <i class="ti ti-alert-triangle me-1"></i>
+      You must choose a new password before you can use the application.
+    </div>
+  <% } %>
+
+  <% if (newToken) { %>
+    <div class="alert alert-success">
+      <div class="d-flex align-items-start">
+        <i class="ti ti-key fs-2 me-2"></i>
+        <div class="flex-fill">
+          <div class="fw-medium mb-1">New token "<%= newToken.name %>" (<%= newToken.scope %>) — copy it now</div>
+          <div class="text-secondary small mb-2">This is the only time we will show this value. Store it in your password manager.</div>
+          <div class="input-group">
+            <input type="text" class="form-control font-monospace" id="new-token-value" readonly value="<%= newToken.token %>">
+            <button type="button" class="btn btn-success" data-copy="#new-token-value"><i class="ti ti-copy me-1"></i>Copy</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (newRecoveryCodes && newRecoveryCodes.length) { %>
+    <div class="alert alert-success mb-3">
+      <div class="fw-medium mb-1"><i class="ti ti-key me-1"></i> Save these recovery codes</div>
+      <div class="small text-secondary mb-2">
+        Each code works exactly once and replaces a TOTP code. This list will not be shown again.
+      </div>
+      <div class="row row-cols-2 row-cols-md-5 g-2 font-monospace fs-3">
+        <% newRecoveryCodes.forEach(function(c) { %>
+          <div class="col"><span class="badge bg-success-lt w-100"><%= c %></span></div>
+        <% }); %>
+      </div>
+    </div>
+  <% } %>
+
+  <div class="row g-3">
+    <!-- Profile + password -->
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">Profile</h3></div>
+        <form method="post" action="/settings/account/profile">
+          <div class="card-body">
+            <div class="mb-3">
+              <label class="form-label">Username</label>
+              <input type="text" class="form-control" value="<%= myUser.username %>" disabled>
+              <div class="form-hint">Usernames cannot be changed. Contact an admin to rename.</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Display name</label>
+              <input type="text" name="display_name" class="form-control" maxlength="120" value="<%= myUser.display_name || '' %>">
+            </div>
+            <div>
+              <label class="form-label">Email</label>
+              <input type="email" name="email" class="form-control" maxlength="255" value="<%= myUser.email || '' %>">
+            </div>
+          </div>
+          <div class="card-footer text-end">
+            <button type="submit" class="btn btn-primary"><i class="ti ti-check me-1"></i>Save profile</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card mt-3">
+        <div class="card-header"><h3 class="card-title">Change password</h3></div>
+        <form method="post" action="/settings/account/password">
+          <div class="card-body">
+            <% if (!myUser.must_change_password) { %>
+              <div class="mb-3">
+                <label class="form-label required">Current password</label>
+                <input type="password" name="current_password" class="form-control" required autocomplete="current-password">
+              </div>
+            <% } else { %>
+              <div class="alert alert-info small mb-3">
+                Initial password reset — enter your new password below. No current password required.
+              </div>
+            <% } %>
+            <div class="mb-3">
+              <label class="form-label required">New password</label>
+              <input type="password" name="new_password" class="form-control" required minlength="8" autocomplete="new-password">
+              <div class="form-hint">At least 8 characters.</div>
+            </div>
+            <div>
+              <label class="form-label required">Confirm new password</label>
+              <input type="password" name="repeat_password" class="form-control" required minlength="8" autocomplete="new-password">
+            </div>
+          </div>
+          <div class="card-footer text-end">
+            <button type="submit" class="btn btn-primary"><i class="ti ti-key me-1"></i>Update password</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 2FA -->
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">
+            Two-factor authentication
+            <% if (myUser.totp_enabled) { %><span class="badge bg-success ms-2">Enabled</span>
+            <% } else if (pending) { %><span class="badge bg-warning ms-2">Pending</span>
+            <% } else { %><span class="badge bg-secondary ms-2">Disabled</span><% } %>
+          </h3>
+        </div>
+        <% if (myUser.totp_enabled) { %>
+          <div class="card-body">
+            <p class="small text-secondary mb-3">
+              TOTP is enabled. Use your authenticator app on every sign-in.
+            </p>
+            <form method="post" action="/settings/account/2fa/regenerate" class="mb-3">
+              <label class="form-label">Regenerate recovery codes</label>
+              <div class="input-group">
+                <input type="text" name="code" class="form-control font-monospace" placeholder="6-digit TOTP" required maxlength="6" pattern="[0-9]*" inputmode="numeric">
+                <button type="submit" class="btn btn-outline-warning"><i class="ti ti-refresh me-1"></i>Regenerate</button>
+              </div>
+              <div class="form-hint">Old recovery codes will be invalidated immediately.</div>
+            </form>
+            <hr>
+            <form method="post" action="/settings/account/2fa/disable">
+              <label class="form-label">Disable two-factor</label>
+              <div class="input-group">
+                <input type="text" name="code" class="form-control font-monospace" placeholder="TOTP or recovery code" required>
+                <button type="submit" class="btn btn-outline-danger"
+                        onclick="return confirm('Disable 2FA on your account?');">
+                  <i class="ti ti-shield-off me-1"></i>Disable
+                </button>
+              </div>
+            </form>
+          </div>
+        <% } else if (pending) { %>
+          <div class="card-body">
+            <ol class="mb-3">
+              <li class="mb-2">Scan the QR code in your authenticator app, or paste the secret:
+                <code class="user-select-all"><%= pending.secret %></code>
+              </li>
+              <li>Enter the 6-digit code your app shows.</li>
+            </ol>
+            <div class="text-center mb-3">
+              <img src="<%= pending.qrDataUrl %>" alt="2FA QR code" class="rounded shadow-sm" style="background: #fff; padding: 8px;">
+            </div>
+            <form method="post" action="/settings/account/2fa/enable">
+              <div class="input-group">
+                <input type="text" name="code" class="form-control form-control-lg font-monospace text-center" placeholder="123 456"
+                       required maxlength="6" pattern="[0-9]*" inputmode="numeric" autofocus>
+                <button type="submit" class="btn btn-primary"><i class="ti ti-check me-1"></i>Confirm &amp; enable</button>
+              </div>
+            </form>
+            <form method="post" action="/settings/account/2fa/cancel" class="mt-2 text-end">
+              <button type="submit" class="btn btn-link text-secondary">Cancel enrollment</button>
+            </form>
+          </div>
+        <% } else { %>
+          <div class="card-body">
+            <p class="small text-secondary mb-3">
+              Add a second factor to your sign-in. Works with Aegis, Google Authenticator, 1Password, Bitwarden, Authy, etc.
+            </p>
+            <form method="post" action="/settings/account/2fa/start">
+              <button type="submit" class="btn btn-primary"><i class="ti ti-shield-lock me-1"></i>Enable two-factor</button>
+            </form>
+          </div>
+        <% } %>
+      </div>
+
+      <!-- Personal API tokens -->
+      <div class="card mt-3">
+        <div class="card-header"><h3 class="card-title">My API tokens (<%= myTokens.length %>)</h3></div>
+        <form method="post" action="/settings/account/tokens">
+          <div class="card-body">
+            <div class="row g-2 align-items-end">
+              <div class="col-md-6">
+                <label class="form-label required">Name</label>
+                <input type="text" name="name" class="form-control" required maxlength="160" placeholder="my-script">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">Scope</label>
+                <select name="scope" class="form-select">
+                  <option value="read" selected>read</option>
+                  <option value="write">write</option>
+                </select>
+              </div>
+              <div class="col-md-3 text-end">
+                <button type="submit" class="btn btn-primary"><i class="ti ti-plus me-1"></i>Generate</button>
+              </div>
+            </div>
+            <div class="form-hint mt-2">
+              These tokens inherit your monitor permissions. You will only see your own monitors via the API.
+            </div>
+          </div>
+        </form>
+        <% if (myTokens.length) { %>
+          <div class="table-responsive">
+            <table class="table table-vcenter table-sm">
+              <thead><tr><th>Name</th><th>Scope</th><th>Last used</th><th class="w-1"></th></tr></thead>
+              <tbody>
+                <% myTokens.forEach(function(t) { %>
+                  <tr>
+                    <td><%= t.name %></td>
+                    <td><span class="badge bg-<%= t.scope === 'write' ? 'red' : 'blue' %>-lt"><%= t.scope %></span></td>
+                    <td class="text-secondary small"><%= t.last_used_at ? new Date(t.last_used_at).toLocaleString() : 'never' %></td>
+                    <td class="text-end">
+                      <form method="post" action="/settings/account/tokens/<%= t.id %>/delete" class="m-0"
+                            onsubmit="return confirm('Revoke token &quot;<%= t.name %>&quot;?');">
+                        <button type="submit" class="btn btn-sm btn-link text-danger"><i class="ti ti-trash"></i></button>
+                      </form>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+<% } %>

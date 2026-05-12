@@ -1,3 +1,49 @@
+/* ──────────────────────────────────────────────────────────────────────────
+   Page header spacing — used on every form / detail page. Without this
+   the breadcrumb-style "Back to …" link sits flush against the H2 below it
+   and the H2 sits flush against the first card.
+   ────────────────────────────────────────────────────────────────────────── */
+.page-pretitle {
+  margin-bottom: 0.35rem;
+  letter-spacing: 0.04em;
+}
+.page-pretitle a.text-secondary.text-decoration-none {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.1rem;
+  border-radius: 4px;
+  transition: color 0.12s ease, background-color 0.12s ease;
+}
+.page-pretitle a.text-secondary.text-decoration-none:hover,
+.page-pretitle a.text-secondary.text-decoration-none:focus-visible {
+  color: var(--tblr-primary, #4263eb) !important;
+  background: rgba(66, 99, 235, 0.08);
+}
+.page-title {
+  margin-top: 0.35rem;
+  margin-bottom: 0.4rem;
+  line-height: 1.25;
+}
+.page-header.d-print-none {
+  margin-bottom: 1.25rem;
+}
+
+/* Branding settings preview tiles */
+.branding-preview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem;
+  border: 1px dashed var(--tblr-border-color, rgba(101, 109, 119, 0.25));
+  border-radius: 8px;
+  background: var(--tblr-bg-surface-secondary, rgba(255, 255, 255, 0.02));
+  min-height: 96px;
+  width: 100%;
+}
+.branding-preview-favicon {
+  min-height: 64px;
+}
+
 .site-card {
   transition: transform 0.12s ease, box-shadow 0.18s ease, border-color 0.18s ease;
   border: 1px solid var(--tblr-border-color, rgba(101, 109, 119, 0.18));
@@ -42,6 +88,74 @@
 }
 @media (hover: none) {
   .site-card-delete { opacity: 1; transform: scale(1); }
+}
+
+/* Bulk-select checkbox on each card, mirrors the delete-button position. */
+.site-card-select {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  z-index: 4;
+  margin: 0;
+  cursor: pointer;
+}
+.site-card-select input {
+  width: 1.15rem;
+  height: 1.15rem;
+  cursor: pointer;
+}
+
+/* Tag chip row inside each card. */
+.site-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+}
+.site-tags .badge {
+  font-size: 0.72rem;
+  padding: 0.25rem 0.5rem;
+}
+
+/* Tag multi-select on the site form. */
+.tag-pick { cursor: pointer; user-select: none; }
+.tag-pick input { display: none; }
+.tag-pick .badge {
+  opacity: 0.55;
+  transition: opacity 0.15s, transform 0.1s;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.85rem;
+}
+.tag-pick input:checked + .badge {
+  opacity: 1;
+  transform: scale(1.04);
+  box-shadow: 0 0 0 2px currentColor;
+}
+
+/* Sticky bulk-action bar at the bottom of the dashboard. */
+.bulk-bar {
+  position: sticky;
+  bottom: 0.75rem;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  margin-top: 0.75rem;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.bulk-bar-inner {
+  pointer-events: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--tblr-bg-surface, #fff);
+  border: 1px solid var(--tblr-border-color, rgba(101, 109, 119, 0.24));
+  border-radius: 0.5rem;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+  padding: 0.55rem 0.8rem;
+  max-width: 100%;
 }
 
 .row-cards-tight {

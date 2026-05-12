@@ -1,0 +1,111 @@
+<div class="page-header d-print-none mb-3">
+  <div class="row g-2 align-items-center">
+    <div class="col">
+      <h2 class="page-title">Maintenance windows</h2>
+      <div class="text-secondary mt-1 small">
+        Suppress alerts (and optionally pause probes) during planned outages.
+        <% if (activeCount > 0) { %>
+          <span class="badge bg-yellow-lt ms-2"><i class="ti ti-tools me-1"></i><%= activeCount %> active now</span>
+        <% } %>
+      </div>
+    </div>
+    <div class="col-auto">
+      <a href="/settings/maintenance/new" class="btn btn-primary">
+        <i class="ti ti-plus me-1"></i> New window
+      </a>
+    </div>
+  </div>
+</div>
+
+<% if (!windows.length) { %>
+  <div class="empty">
+    <p class="empty-title">No maintenance windows yet</p>
+    <p class="empty-subtitle text-secondary">
+      Create one to silence notifications during deployments or known outages.
+      You can target all monitors (global) or a single monitor, and schedule it
+      either as a one-off block or a recurring cron-style window.
+    </p>
+    <div class="empty-action">
+      <a href="/settings/maintenance/new" class="btn btn-primary">
+        <i class="ti ti-plus me-1"></i> Create your first window
+      </a>
+    </div>
+  </div>
+<% } else { %>
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-vcenter">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Target</th>
+            <th>Schedule</th>
+            <th>Effects</th>
+            <th>Status</th>
+            <th class="w-1 text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% windows.forEach(function(w) { %>
+            <tr class="<%= w.active ? 'bg-yellow-lt' : '' %>">
+              <td>
+                <strong><%= w.name %></strong>
+                <% if (!w.enabled) { %>
+                  <span class="badge bg-secondary-lt ms-1">disabled</span>
+                <% } %>
+              </td>
+              <td>
+                <% if (w.scope === 'global') { %>
+                  <span class="badge bg-blue-lt"><i class="ti ti-world me-1"></i>all monitors</span>
+                <% } else { %>
+                  <span class="badge bg-secondary-lt"><i class="ti ti-target me-1"></i><%= w.target_label %></span>
+                <% } %>
+              </td>
+              <td>
+                <% if (w.kind === 'oneoff') { %>
+                  <div class="small">
+                    <span class="text-secondary">one-off</span><br>
+                    <code><%= w.starts_at %></code> → <code><%= w.ends_at %></code>
+                  </div>
+                <% } else { %>
+                  <div class="small">
+                    <span class="text-secondary">recurring</span> <code><%= w.cron %></code>
+                    × <%= w.duration_minutes %>m<br>
+                    <span class="text-secondary"><%= w.timezone || 'UTC' %></span>
+                  </div>
+                <% } %>
+              </td>
+              <td class="small">
+                <% if (w.suppress_notifications) { %>
+                  <span class="d-block"><i class="ti ti-bell-off text-warning me-1"></i>silence alerts</span>
+                <% } %>
+                <% if (w.pause_probes) { %>
+                  <span class="d-block"><i class="ti ti-player-pause text-warning me-1"></i>pause probes</span>
+                <% } %>
+              </td>
+              <td class="small text-secondary"><%= w.summary %></td>
+              <td class="text-end">
+                <div class="btn-list flex-nowrap justify-content-end">
+                  <form method="post" action="/settings/maintenance/<%= w.id %>/toggle" class="m-0">
+                    <button type="submit" class="btn btn-sm btn-link" title="<%= w.enabled ? 'Disable' : 'Enable' %>">
+                      <i class="ti <%= w.enabled ? 'ti-toggle-right' : 'ti-toggle-left' %>"></i>
+                    </button>
+                  </form>
+                  <a href="/settings/maintenance/<%= w.id %>/edit" class="btn btn-sm btn-link" title="Edit">
+                    <i class="ti ti-edit"></i>
+                  </a>
+                  <form method="post" action="/settings/maintenance/<%= w.id %>/delete" class="m-0"
+                        onsubmit="return confirm('Delete this maintenance window?');">
+                    <button type="submit" class="btn btn-sm btn-link text-danger" title="Delete">
+                      <i class="ti ti-trash"></i>
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% } %>

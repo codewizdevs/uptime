@@ -3,9 +3,8 @@
     <div class="col">
       <div class="page-pretitle"><a href="/channels" class="text-secondary text-decoration-none"><i class="ti ti-arrow-left me-1"></i> Channels</a></div>
       <h2 class="page-title">
-        <% if (channel.type === 'discord') { %><i class="ti ti-brand-discord me-2"></i><% } %>
-        <% if (channel.type === 'webhook') { %><i class="ti ti-webhook me-2"></i><% } %>
-        <% if (channel.type === 'email') { %><i class="ti ti-mail me-2"></i><% } %>
+        <% var meta = CHANNEL_META[channel.type] || {}; %>
+        <% if (meta.icon) { %><i class="ti <%= meta.icon %> me-2"></i><% } %>
         <%= title %>
       </h2>
     </div>
@@ -89,6 +88,187 @@
     </div>
   <% } %>
 
+  <% if (channel.type === 'slack' || channel.type === 'mattermost') { %>
+    <div class="card-body border-top">
+      <h3 class="card-title"><%= channel.type === 'slack' ? 'Slack incoming webhook' : 'Mattermost incoming webhook' %></h3>
+      <div class="mb-3">
+        <label class="form-label required">Webhook URL</label>
+        <input type="url" name="webhook_url" class="form-control font-monospace"
+               value="<%= channel.config.webhook_url || '' %>"
+               placeholder="<%= channel.type === 'slack' ? 'https://hooks.slack.com/services/T.../B.../...' : 'https://mattermost.example.com/hooks/...' %>" required>
+        <div class="form-hint">
+          <% if (channel.type === 'slack') { %>
+            Slack workspace → Apps → Incoming Webhooks. Pick a channel, copy the URL.
+          <% } else { %>
+            Mattermost → Integrations → Incoming Webhooks. Copy the URL Mattermost gives you.
+          <% } %>
+        </div>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (channel.type === 'telegram') { %>
+    <div class="card-body border-top">
+      <h3 class="card-title">Telegram bot</h3>
+      <div class="alert alert-info small">
+        Create a bot via <code>@BotFather</code> in Telegram, then message your bot once (or add it to a group / channel) so it can read the chat ID.
+      </div>
+      <div class="row g-3">
+        <div class="col-md-12">
+          <label class="form-label required">Bot token</label>
+          <input type="text" name="bot_token" class="form-control font-monospace"
+                 value="<%= channel.config.bot_token || '' %>"
+                 placeholder="123456789:ABCdef..." required autocomplete="off">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label required">Chat ID</label>
+          <input type="text" name="chat_id" class="form-control"
+                 value="<%= channel.config.chat_id || '' %>"
+                 placeholder="-1001234567890 or 987654321" required>
+          <div class="form-hint">Group / channel IDs start with <code>-100</code>; private chats are positive integers.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Message thread ID (optional)</label>
+          <input type="text" name="message_thread_id" class="form-control"
+                 value="<%= channel.config.message_thread_id || '' %>" placeholder="forum topic ID">
+        </div>
+        <div class="col-md-12">
+          <label class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" name="disable_preview" value="1" <%= channel.config.disable_preview ? 'checked' : '' %>>
+            <span class="form-check-label">Disable link previews</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (channel.type === 'ntfy') { %>
+    <div class="card-body border-top">
+      <h3 class="card-title">Ntfy</h3>
+      <div class="row g-3">
+        <div class="col-md-12">
+          <label class="form-label required">Topic URL</label>
+          <input type="url" name="topic_url" class="form-control font-monospace"
+                 value="<%= channel.config.topic_url || '' %>"
+                 placeholder="https://ntfy.sh/my-uptime-topic" required>
+          <div class="form-hint">Use ntfy.sh or your own self-hosted ntfy server. The path is the topic.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Auth token (optional)</label>
+          <input type="text" name="auth_token" class="form-control"
+                 value="<%= channel.config.auth_token || '' %>"
+                 placeholder="ntfy_token (for protected topics)" autocomplete="off">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Priority</label>
+          <select name="priority" class="form-select">
+            <% [1,2,3,4,5].forEach(function(p) { %>
+              <option value="<%= p %>" <%= (channel.config.priority || 3) === p ? 'selected' : '' %>><%= p %></option>
+            <% }) %>
+          </select>
+          <div class="form-hint">1 = min, 5 = urgent</div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Tags (comma sep)</label>
+          <input type="text" name="tags" class="form-control"
+                 value="<%= (channel.config.tags || []).join(',') %>"
+                 placeholder="warning,fire">
+        </div>
+        <div class="col-md-12">
+          <label class="form-label">Click URL (optional)</label>
+          <input type="url" name="click_url" class="form-control"
+                 value="<%= channel.config.click_url || '' %>" placeholder="https://...">
+          <div class="form-hint">Defaults to the monitored URL.</div>
+        </div>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (channel.type === 'gotify') { %>
+    <div class="card-body border-top">
+      <h3 class="card-title">Gotify</h3>
+      <div class="row g-3">
+        <div class="col-md-8">
+          <label class="form-label required">Server URL</label>
+          <input type="url" name="server_url" class="form-control font-monospace"
+                 value="<%= channel.config.server_url || '' %>"
+                 placeholder="https://gotify.example.com" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Priority</label>
+          <input type="number" name="priority" class="form-control" min="0" max="10" step="1"
+                 value="<%= channel.config.priority == null ? 5 : channel.config.priority %>">
+          <div class="form-hint">0 (silent) → 10 (loud)</div>
+        </div>
+        <div class="col-md-12">
+          <label class="form-label required">App token</label>
+          <input type="text" name="app_token" class="form-control font-monospace"
+                 value="<%= channel.config.app_token || '' %>"
+                 placeholder="A.token.from.your.gotify.app" required autocomplete="off">
+        </div>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (channel.type === 'pushover') { %>
+    <div class="card-body border-top">
+      <h3 class="card-title">Pushover</h3>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label required">App token</label>
+          <input type="text" name="app_token" class="form-control font-monospace"
+                 value="<%= channel.config.app_token || '' %>" required autocomplete="off">
+          <div class="form-hint">From your Pushover application page.</div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label required">User key</label>
+          <input type="text" name="user_key" class="form-control font-monospace"
+                 value="<%= channel.config.user_key || '' %>" required autocomplete="off">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Device (optional)</label>
+          <input type="text" name="device" class="form-control"
+                 value="<%= channel.config.device || '' %>" placeholder="iphone, pixel">
+          <div class="form-hint">Comma-separated list, or blank for all devices.</div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Priority</label>
+          <select name="priority" class="form-select">
+            <% [
+              [-2, 'Lowest (silent)'],
+              [-1, 'Low'],
+              [0,  'Normal'],
+              [1,  'High'],
+              [2,  'Emergency (60s retry, 1h expire)'],
+            ].forEach(function(p) { %>
+              <option value="<%= p[0] %>" <%= (channel.config.priority || 0) === p[0] ? 'selected' : '' %>><%= p[1] %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Sound (optional)</label>
+          <input type="text" name="sound" class="form-control"
+                 value="<%= channel.config.sound || '' %>" placeholder="siren, bike, ...">
+        </div>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (channel.type === 'teams') { %>
+    <div class="card-body border-top">
+      <h3 class="card-title">Microsoft Teams</h3>
+      <div class="alert alert-info small">
+        Use either the legacy <em>Incoming Webhook</em> connector or the new <em>"Post to a channel when a webhook request is received"</em> Workflow (recommended). Both accept the same payload.
+      </div>
+      <div class="mb-3">
+        <label class="form-label required">Webhook URL</label>
+        <input type="url" name="webhook_url" class="form-control font-monospace"
+               value="<%= channel.config.webhook_url || '' %>"
+               placeholder="https://outlook.office.com/webhook/... or https://prod-XX.westeurope.logic.azure.com/..." required>
+      </div>
+    </div>
+  <% } %>
+
   <div class="card-body border-top">
     <div class="d-flex align-items-center mb-2">
       <h3 class="card-title mb-0">Message templates</h3>
@@ -143,8 +323,20 @@
                 Discord embed description. Markdown supported (<code>**bold**</code>, <code>`code`</code>, <code>\n</code> for line breaks).
               <% } else if (channel.type === 'email') { %>
                 Plain-text email body. Bold (<code>**...**</code>) and inline code (<code>`...`</code>) become HTML in the rich part.
-              <% } else { %>
+              <% } else if (channel.type === 'webhook') { %>
                 Raw HTTP request body. Use the same content-type set above. Default is JSON.
+              <% } else if (channel.type === 'slack' || channel.type === 'mattermost') { %>
+                Slack-style markdown: <code>*bold*</code>, <code>`code`</code>, <code>:emoji:</code>. Rendered as a colored attachment.
+              <% } else if (channel.type === 'telegram') { %>
+                Telegram <code>parse_mode=HTML</code>. Supports <code>&lt;b&gt;</code>, <code>&lt;i&gt;</code>, <code>&lt;code&gt;</code>, <code>&lt;a href=&quot;&quot;&gt;</code>.
+              <% } else if (channel.type === 'ntfy') { %>
+                Plain text. Title is sent as the notification title.
+              <% } else if (channel.type === 'gotify') { %>
+                Plain text. Gotify renders markdown if the priority and client support it.
+              <% } else if (channel.type === 'pushover') { %>
+                Short plain text (max ~1024 chars). Pushover prepends the title automatically.
+              <% } else if (channel.type === 'teams') { %>
+                Markdown rendered inside an Office 365 MessageCard. <code>**bold**</code>, double-space then newline.
               <% } %>
               Leave empty to fall back to the default template.
             </div>
@@ -187,4 +379,4 @@
   </div>
 <% } %>
 
-<script src="/static/js/channel-form.js"></script>
+<script src="/static/js/channel-form.js?v=<%= assetV %>"></script>

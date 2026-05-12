@@ -1,0 +1,89 @@
+<div class="page-header d-print-none mb-3">
+  <div class="row g-2 align-items-center">
+    <div class="col">
+      <div class="page-pretitle"><a href="/settings/users" class="text-secondary text-decoration-none"><i class="ti ti-chevron-left"></i> Users</a></div>
+      <h2 class="page-title">Grants for <code><%= target.username %></code></h2>
+      <div class="text-secondary mt-1 small">
+        Pick which monitors <strong><%= target.username %></strong> can see, and at what level.
+        Monitors they own (created themselves) are not listed below — they always have manage on those.
+        <% if (target.role === 'admin') { %>
+          <br>This user is an <strong>admin</strong> — they see and manage every monitor regardless of these grants.
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<form method="post" action="/settings/users/<%= target.id %>/grants" class="card">
+  <div class="card-body">
+    <% if (!allSites.length) { %>
+      <div class="empty">
+        <p class="empty-title">No monitors yet</p>
+        <p class="empty-subtitle text-secondary">Create at least one monitor before assigning grants.</p>
+      </div>
+    <% } else { %>
+      <div class="d-flex align-items-center mb-2">
+        <div class="text-secondary small">
+          <%= allSites.length %> monitor<%= allSites.length === 1 ? '' : 's' %> total.
+        </div>
+        <div class="ms-auto small">
+          <button type="button" class="btn btn-sm btn-outline-secondary me-1" id="grants-set-none">Reset all to <em>none</em></button>
+          <button type="button" class="btn btn-sm btn-outline-secondary me-1" id="grants-set-view">All <em>view</em></button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="grants-set-manage">All <em>manage</em></button>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-vcenter table-sm">
+          <thead>
+            <tr>
+              <th>Monitor</th>
+              <th>Type</th>
+              <th class="w-1 text-center">None</th>
+              <th class="w-1 text-center">View</th>
+              <th class="w-1 text-center">Manage</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% allSites.forEach(function(s) {
+                 const current = grantMap.get(Number(s.id)) || (s.owner_user_id === target.id ? 'owner' : null);
+                 const isOwner = s.owner_user_id === target.id;
+            %>
+              <tr>
+                <td>
+                  <a href="/sites/<%= s.id %>" class="text-decoration-none"><%= s.name %></a>
+                  <% if (isOwner) { %>
+                    <span class="badge bg-blue-lt ms-1" title="User owns this monitor">owner</span>
+                  <% } %>
+                </td>
+                <td><span class="badge bg-secondary-lt"><%= s.monitor_type %></span></td>
+                <% if (isOwner) { %>
+                  <td colspan="3" class="text-center text-secondary small">
+                    <i class="ti ti-info-circle me-1"></i>Always has manage (owner)
+                  </td>
+                <% } else { %>
+                  <% ['', 'view', 'manage'].forEach(function(opt) {
+                       const checked = (opt === '' && !current) || current === opt;
+                  %>
+                    <td class="text-center">
+                      <input type="radio" class="form-check-input grant-cell"
+                             name="permissions[<%= s.id %>]"
+                             value="<%= opt %>"
+                             <%= checked ? 'checked' : '' %>>
+                    </td>
+                  <% }); %>
+                <% } %>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+  <div class="card-footer text-end">
+    <a href="/settings/users" class="btn btn-link">Cancel</a>
+    <button type="submit" class="btn btn-primary"><i class="ti ti-check me-1"></i>Save grants</button>
+  </div>
+</form>
+
+<script src="/static/js/settings-user-grants.js?v=<%= assetV %>" defer></script>

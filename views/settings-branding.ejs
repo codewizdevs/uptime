@@ -1,0 +1,184 @@
+<div class="page-header d-print-none">
+  <div class="row g-2 align-items-center">
+    <div class="col">
+      <div class="page-pretitle">
+        <a href="/" class="text-secondary text-decoration-none">
+          <i class="ti ti-arrow-left me-1"></i> Dashboard
+        </a>
+      </div>
+      <h2 class="page-title"><i class="ti ti-paint me-2"></i> Branding &amp; whitelabel</h2>
+      <div class="text-secondary mt-1">
+        App name, tagline, footer credits, logo and favicon. Anything left blank falls back to
+        environment variables (if set) or the bundled defaults.
+      </div>
+    </div>
+  </div>
+</div>
+
+<form method="post" action="/settings/branding" enctype="multipart/form-data" class="card mb-3">
+  <div class="card-body">
+    <h3 class="card-title">Identity</h3>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">App name</label>
+        <input type="text" name="appName" class="form-control" maxlength="120"
+               value="<%= current.appName || '' %>"
+               placeholder="<%= defaults.appName %>">
+        <div class="form-hint">Shown in the navbar, page titles and the login screen. Default: <code><%= defaults.appName %></code>.</div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Tagline</label>
+        <input type="text" name="tagline" class="form-control" maxlength="255"
+               value="<%= current.tagline || '' %>"
+               placeholder="<%= defaults.tagline %>">
+        <div class="form-hint">Sub-text in the footer next to the app name. Leave blank to hide.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-body border-top">
+    <h3 class="card-title">Footer credits</h3>
+    <div class="row g-3">
+      <div class="col-md-3">
+        <label class="form-check form-switch mt-md-4">
+          <input class="form-check-input" type="checkbox" name="credits_hide" value="1"
+                 <%= current.credits.hide ? 'checked' : '' %>>
+          <span class="form-check-label">Hide credits entirely</span>
+        </label>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Lead text</label>
+        <input type="text" name="credits_lead" class="form-control" maxlength="120"
+               value="<%= current.credits.lead || '' %>"
+               placeholder="<%= defaults.credits.lead %>">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Credit text</label>
+        <input type="text" name="credits_text" class="form-control" maxlength="120"
+               value="<%= current.credits.text || '' %>"
+               placeholder="<%= defaults.credits.text %>">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Credit URL</label>
+        <input type="url" name="credits_url" class="form-control" maxlength="512"
+               value="<%= current.credits.url || '' %>"
+               placeholder="<%= defaults.credits.url %>">
+      </div>
+    </div>
+    <div class="form-hint mt-2">
+      Renders as:
+      <span class="text-body">
+        <% if (current.credits.lead) { %><%= current.credits.lead %> <% } %>
+        <a href="<%= current.credits.url %>" target="_blank" rel="noopener"><%= current.credits.text %></a>
+      </span>
+    </div>
+  </div>
+
+  <div class="card-body border-top">
+    <h3 class="card-title">Logo</h3>
+    <div class="row g-3 align-items-center">
+      <div class="col-md-3 text-center">
+        <div class="branding-preview branding-preview-logo">
+          <img src="/branding/logo?v=<%= current.logoVersion || Date.now() %>"
+               alt="Current logo" width="96" height="96"
+               style="object-fit: contain; max-width: 100%;">
+        </div>
+        <div class="text-secondary small mt-1">
+          <%= current.hasCustomLogo ? 'Custom logo' : 'Bundled default' %>
+        </div>
+      </div>
+      <div class="col-md-9">
+        <label class="form-label">Upload a new logo</label>
+        <input type="file" name="logo_file" class="form-control" accept=".svg,.png,.jpg,.jpeg,.webp,.gif,image/svg+xml,image/png,image/jpeg,image/webp,image/gif">
+        <div class="form-hint">
+          SVG, PNG, JPEG, WebP or GIF. Max <%= Math.round(maxBytes / 1024) %> KB.
+          Used in the navbar (36×36), dashboard empty state (80×80) and status page header (36×36).
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-body border-top">
+    <h3 class="card-title">Favicon</h3>
+    <div class="row g-3 align-items-center">
+      <div class="col-md-3 text-center">
+        <div class="branding-preview branding-preview-favicon">
+          <img src="/branding/favicon?v=<%= current.faviconVersion || Date.now() %>"
+               alt="Current favicon" width="48" height="48"
+               style="object-fit: contain; max-width: 100%;">
+        </div>
+        <div class="text-secondary small mt-1">
+          <%= current.hasCustomFavicon ? 'Custom favicon' : 'Bundled default' %>
+        </div>
+      </div>
+      <div class="col-md-9">
+        <label class="form-label">Upload a new favicon</label>
+        <input type="file" name="favicon_file" class="form-control" accept=".svg,.png,.ico,.webp,.gif,image/svg+xml,image/png,image/x-icon,image/vnd.microsoft.icon,image/webp,image/gif">
+        <div class="form-hint">
+          SVG, PNG, ICO, WebP or GIF. Max <%= Math.round(maxBytes / 1024) %> KB.
+          Used as <code>&lt;link rel="icon"&gt;</code> and Apple touch icon.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-footer d-flex flex-wrap gap-2 align-items-center">
+    <button type="submit" class="btn btn-primary">
+      <i class="ti ti-device-floppy me-1"></i> Save branding
+    </button>
+    <span class="text-secondary small ms-md-2">
+      <i class="ti ti-info-circle me-1"></i>
+      Changes take effect on the next page load — no restart needed.
+    </span>
+  </div>
+</form>
+
+<div class="row g-3">
+  <% if (current.hasCustomLogo) { %>
+    <div class="col-md-4">
+      <form method="post" action="/settings/branding/logo/delete" class="card h-100">
+        <div class="card-body">
+          <h3 class="card-title">Remove custom logo</h3>
+          <p class="text-secondary small mb-3">
+            Falls back to <code>APP_LOGO_PATH</code> if set in <code>.env</code>, otherwise the bundled SVG.
+          </p>
+          <button type="submit" class="btn btn-outline-danger w-100"
+                  onclick="return confirm('Remove the uploaded logo?')">
+            <i class="ti ti-photo-off me-1"></i> Remove logo
+          </button>
+        </div>
+      </form>
+    </div>
+  <% } %>
+  <% if (current.hasCustomFavicon) { %>
+    <div class="col-md-4">
+      <form method="post" action="/settings/branding/favicon/delete" class="card h-100">
+        <div class="card-body">
+          <h3 class="card-title">Remove custom favicon</h3>
+          <p class="text-secondary small mb-3">
+            Falls back to <code>APP_FAVICON_PATH</code> if set, otherwise the bundled SVG.
+          </p>
+          <button type="submit" class="btn btn-outline-danger w-100"
+                  onclick="return confirm('Remove the uploaded favicon?')">
+            <i class="ti ti-photo-off me-1"></i> Remove favicon
+          </button>
+        </div>
+      </form>
+    </div>
+  <% } %>
+  <div class="col-md-4">
+    <form method="post" action="/settings/branding/reset" class="card h-100">
+      <div class="card-body">
+        <h3 class="card-title">Reset text to defaults</h3>
+        <p class="text-secondary small mb-3">
+          Clears app name, tagline and footer credits stored in the database.
+          Logo and favicon uploads are kept — use the buttons above to remove them.
+        </p>
+        <button type="submit" class="btn btn-outline-secondary w-100"
+                onclick="return confirm('Reset name, tagline and credits to defaults?')">
+          <i class="ti ti-restore me-1"></i> Reset text
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

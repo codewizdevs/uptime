@@ -1,0 +1,175 @@
+<%
+  function toLocalInput(iso) {
+    if (!iso) return '';
+    try {
+      const d = new Date(iso);
+      if (Number.isNaN(d.valueOf())) return '';
+      // datetime-local needs "YYYY-MM-DDTHH:MM" in the browser's local time
+      // for round-trip. We render the stored UTC instant in *local* clock to
+      // match the original user input.
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    } catch { return ''; }
+  }
+%>
+
+<div class="page-header d-print-none mb-3">
+  <div class="row g-2 align-items-center">
+    <div class="col">
+      <div class="page-pretitle">
+        <a href="/settings/maintenance" class="text-secondary text-decoration-none">
+          <i class="ti ti-arrow-left me-1"></i> Back to maintenance windows
+        </a>
+      </div>
+      <h2 class="page-title"><%= title %></h2>
+    </div>
+  </div>
+</div>
+
+<form method="post" action="<%= formAction %>" class="card" id="maintenance-form">
+  <div class="card-body">
+    <h3 class="card-title">Basics</h3>
+    <div class="row g-3">
+      <div class="col-md-9">
+        <label class="form-label required">Name</label>
+        <input type="text" name="name" class="form-control" required maxlength="160"
+               value="<%= window.name || '' %>" placeholder="Tuesday DB rolling upgrade">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Enabled</label>
+        <div>
+          <label class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" name="enabled" value="1"
+                   <%= window.enabled ? 'checked' : '' %>>
+            <span class="form-check-label">Active</span>
+          </label>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Scope</label>
+        <select name="scope" id="mw-scope" class="form-select">
+          <option value="global"  <%= window.scope === 'global'  ? 'selected' : '' %>>Global — applies to every monitor</option>
+          <option value="monitor" <%= window.scope === 'monitor' ? 'selected' : '' %>>Specific monitor</option>
+        </select>
+      </div>
+      <div class="col-md-6" data-scope="monitor" <%= window.scope === 'monitor' ? '' : 'hidden' %>>
+        <label class="form-label">Monitor</label>
+        <select name="scope_value" class="form-select">
+          <option value="">— choose a monitor —</option>
+          <% sites.forEach(function(s) { %>
+            <option value="<%= s.id %>"
+              <%= String(window.scope_value || '') === String(s.id) ? 'selected' : '' %>>
+              <%= s.name %> (<%= s.monitor_type %>)
+            </option>
+          <% }); %>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-body border-top">
+    <h3 class="card-title">Schedule</h3>
+    <div class="row g-3">
+      <div class="col-md-12">
+        <label class="form-label">Type</label>
+        <div class="btn-group w-100" role="group">
+          <input type="radio" class="btn-check" name="kind" id="kind-oneoff" value="oneoff" <%= window.kind === 'oneoff' ? 'checked' : '' %>>
+          <label class="btn btn-outline-secondary" for="kind-oneoff">
+            <i class="ti ti-calendar-event me-1"></i> One-off
+          </label>
+          <input type="radio" class="btn-check" name="kind" id="kind-recurring" value="recurring" <%= window.kind === 'recurring' ? 'checked' : '' %>>
+          <label class="btn btn-outline-secondary" for="kind-recurring">
+            <i class="ti ti-repeat me-1"></i> Recurring (cron)
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3 mt-1" data-kind="oneoff" <%= window.kind === 'oneoff' ? '' : 'hidden' %>>
+      <div class="col-md-6">
+        <label class="form-label required">Starts at</label>
+        <input type="datetime-local" name="starts_at" class="form-control"
+               value="<%= toLocalInput(window.starts_at) %>">
+        <div class="form-hint">Your local time. Stored as UTC.</div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label required">Ends at</label>
+        <input type="datetime-local" name="ends_at" class="form-control"
+               value="<%= toLocalInput(window.ends_at) %>">
+      </div>
+    </div>
+
+    <div class="row g-3 mt-1" data-kind="recurring" <%= window.kind === 'recurring' ? '' : 'hidden' %>>
+      <div class="col-md-6">
+        <label class="form-label required">Cron expression</label>
+        <input type="text" name="cron" class="form-control font-monospace"
+               value="<%= window.cron || '0 2 * * 0' %>" placeholder="0 2 * * 0">
+        <div class="form-hint">Standard 5-field cron. Examples: <code>0 2 * * 0</code> = Sundays 02:00, <code>*/15 * * * *</code> = every 15 min, <code>0 4 1 * *</code> = first of the month at 04:00.</div>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label required">Duration (minutes)</label>
+        <input type="number" name="duration_minutes" class="form-control" min="1" max="10080"
+               value="<%= window.duration_minutes || 60 %>">
+        <div class="form-hint">Max 10080 (one week).</div>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Timezone</label>
+        <select name="timezone" class="form-select">
+          <% knownTimezones.forEach(function(tz) { %>
+            <option value="<%= tz %>" <%= (window.timezone || 'UTC') === tz ? 'selected' : '' %>><%= tz %></option>
+          <% }); %>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-body border-top">
+    <h3 class="card-title">Effects</h3>
+    <div class="row g-3">
+      <div class="col-12">
+        <label class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="suppress_notifications" value="1"
+                 <%= window.suppress_notifications ? 'checked' : '' %>>
+          <span class="form-check-label">Silence alerts</span>
+        </label>
+        <div class="form-hint">All <code>down</code>, <code>recovered</code>, <code>challenged</code> and <code>cert_expiring</code> events are dropped while the window is active.</div>
+      </div>
+      <div class="col-12">
+        <label class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="pause_probes" value="1"
+                 <%= window.pause_probes ? 'checked' : '' %>>
+          <span class="form-check-label">Pause probes</span>
+        </label>
+        <div class="form-hint">Skip the HTTP/TCP/Ping/DNS request entirely. Useful if you know the target will refuse connections. Heartbeats are unaffected.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-footer text-end">
+    <a href="/settings/maintenance" class="btn btn-link">Cancel</a>
+    <button type="submit" class="btn btn-primary"><%= submitLabel %></button>
+  </div>
+</form>
+
+<script>
+(function() {
+  var scopeSel = document.getElementById('mw-scope');
+  var kindRadios = document.querySelectorAll('input[name="kind"]');
+  function syncScope() {
+    document.querySelectorAll('[data-scope]').forEach(function(el) {
+      el.hidden = el.getAttribute('data-scope') !== scopeSel.value;
+    });
+  }
+  function syncKind() {
+    var v = document.querySelector('input[name="kind"]:checked').value;
+    document.querySelectorAll('[data-kind]').forEach(function(el) {
+      el.hidden = el.getAttribute('data-kind') !== v;
+    });
+  }
+  if (scopeSel) { scopeSel.addEventListener('change', syncScope); syncScope(); }
+  if (kindRadios.length) {
+    kindRadios.forEach(function(r) { r.addEventListener('change', syncKind); });
+    syncKind();
+  }
+})();
+</script>

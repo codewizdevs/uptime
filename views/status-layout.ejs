@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en" data-bs-theme="<%= typeof theme !== 'undefined' ? theme : 'dark' %>">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="referrer" content="no-referrer">
+  <title><%= typeof title !== 'undefined' ? title : (statusPageTitle || (branding.appName + ' status')) %></title>
+  <% if (typeof description !== 'undefined' && description) { %>
+    <meta name="description" content="<%= description %>">
+  <% } %>
+  <% if (typeof rssUrl !== 'undefined' && rssUrl) { %>
+    <link rel="alternate" type="application/atom+xml" title="Incidents" href="<%= rssUrl %>">
+  <% } %>
+
+  <link rel="icon" href="/branding/favicon?v=<%= branding.faviconVersion || assetV %>">
+  <link rel="apple-touch-icon" href="/branding/favicon?v=<%= branding.faviconVersion || assetV %>">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/css/tabler.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.34.0/dist/tabler-icons.min.css">
+  <link rel="stylesheet" href="/static/css/app.css?v=<%= assetV %>">
+  <link rel="stylesheet" href="/static/css/status.css?v=<%= assetV %>">
+
+  <script>
+    (function () {
+      try {
+        var m = document.cookie.match(/(?:^|;\s*)theme=([^;]+)/);
+        document.documentElement.setAttribute('data-bs-theme', m && m[1] ? decodeURIComponent(m[1]) : 'dark');
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body class="public-status">
+  <div class="page">
+    <header class="status-header">
+      <div class="container-xl py-4">
+        <div class="d-flex align-items-center gap-3 flex-wrap">
+          <a href="/status<%= typeof tokenQuery !== 'undefined' ? tokenQuery : '' %>" class="d-flex align-items-center gap-2 text-decoration-none text-body">
+            <img src="/branding/logo?v=<%= branding.logoVersion || assetV %>" alt="" width="36" height="36">
+            <span class="fw-bold fs-3"><%= statusPageTitle || (branding.appName + ' status') %></span>
+          </a>
+          <span class="ms-auto small text-secondary">
+            <i class="ti ti-rss"></i>
+            <a href="/status.rss<%= typeof tokenQuery !== 'undefined' ? tokenQuery : '' %>" class="text-secondary text-decoration-none">RSS</a>
+          </span>
+        </div>
+        <% if (typeof statusPageDescription !== 'undefined' && statusPageDescription) { %>
+          <div class="text-secondary mt-2"><%= statusPageDescription %></div>
+        <% } %>
+      </div>
+    </header>
+    <div class="page-wrapper">
+      <div class="page-body">
+        <div class="container-xl">
+          <%- body %>
+        </div>
+      </div>
+      <footer class="status-footer text-center text-secondary py-4">
+        <div class="container-xl">
+          <small>
+            Powered by <a href="https://github.com/codewizdevs/uptime" target="_blank" rel="noopener noreferrer" class="text-secondary"><%= branding.appName %></a>
+            &middot;
+            <span>Last updated <span data-relative-time="<%= renderedAt %>"><%= renderedAt %></span></span>
+          </small>
+        </div>
+      </footer>
+    </div>
+  </div>
+  <script src="/static/js/status.js?v=<%= assetV %>"></script>
+</body>
+</html>

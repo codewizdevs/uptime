@@ -1,0 +1,78 @@
+# Two deployment profiles are provided.
+#
+#   docker compose up -d                   # default: SQLite (file under ./data)
+#   docker compose --profile mysql up -d   # bring up an extra mysql container
+#
+# Copy .env.example -> .env and adjust ADMIN_USER / ADMIN_PASS / SESSION_SECRET
+# before exposing the container to anything beyond localhost.
+
+services:
+  uptime:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: codewizdevs/uptime:latest
+    container_name: uptime
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT:-3000}:3000"
+    environment:
+      PORT: "3000"
+      SESSION_SECRET: "${SESSION_SECRET:?set SESSION_SECRET in .env}"
+      APP_DEBUG: "${APP_DEBUG:-false}"
+      PUBLIC_BASE_URL: "${PUBLIC_BASE_URL:-http://localhost:3000}"
+      ADMIN_USER: "${ADMIN_USER:-admin}"
+      ADMIN_PASS: "${ADMIN_PASS:?set ADMIN_PASS in .env}"
+
+      # Database — defaults to SQLite. Override DB_DRIVER=mysql + DB_* to use
+      # the mysql container under the `mysql` profile.
+      DB_DRIVER: "${DB_DRIVER:-sqlite}"
+      SQLITE_PATH: "/data/uptime.sqlite"
+      DB_HOST: "${DB_HOST:-mysql}"
+      DB_PORT: "${DB_PORT:-3306}"
+      DB_USER: "${DB_USER:-uptime}"
+      DB_PASSWORD: "${DB_PASSWORD:-}"
+      DB_NAME: "${DB_NAME:-uptime}"
+
+      # Optional whitelabel
+      APP_NAME: "${APP_NAME:-}"
+      FOOTER_TEXT: "${FOOTER_TEXT:-}"
+      FOOTER_LINK: "${FOOTER_LINK:-}"
+    volumes:
+      - uptime-data:/data
+      - uptime-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000/healthz',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    cap_add:
+      # Required for the ICMP "ping" monitor type from inside a container.
+      # Without this the `ping` binary cannot create the raw socket.
+      - NET_RAW
+
+  mysql:
+    image: mysql:8.4
+    container_name: uptime-mysql
+    restart: unless-stopped
+    profiles: ["mysql"]
+    environment:
+      MYSQL_DATABASE: "${DB_NAME:-uptime}"
+      MYSQL_USER: "${DB_USER:-uptime}"
+      MYSQL_PASSWORD: "${DB_PASSWORD:?set DB_PASSWORD in .env when using mysql profile}"
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+volumes:
+  uptime-data:
+  uptime-logs:
+  mysql-data:

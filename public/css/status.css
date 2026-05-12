@@ -1,0 +1,110 @@
+/* Public status page styles. Layered on top of app.css. */
+
+body.public-status {
+  background: var(--tblr-bg-surface, #1a1d24);
+}
+
+.status-header {
+  border-bottom: 1px solid var(--tblr-border-color, rgba(255, 255, 255, 0.08));
+  background: var(--tblr-bg-surface-secondary, rgba(255, 255, 255, 0.02));
+}
+
+.status-overall {
+  border-radius: 0.5rem;
+  padding: 1.25rem 1.5rem;
+  margin-top: 1rem;
+  border: 1px solid transparent;
+}
+.status-overall.overall-ok {
+  background: rgba(47, 179, 68, 0.08);
+  border-color: rgba(47, 179, 68, 0.4);
+  color: #74e1a2;
+}
+.status-overall.overall-warn {
+  background: rgba(245, 159, 0, 0.08);
+  border-color: rgba(245, 159, 0, 0.4);
+  color: #ffc94d;
+}
+.status-overall.overall-down {
+  background: rgba(214, 51, 108, 0.08);
+  border-color: rgba(214, 51, 108, 0.4);
+  color: #ff7aa5;
+}
+.status-overall.overall-idle {
+  background: rgba(120, 120, 120, 0.08);
+  border-color: rgba(120, 120, 120, 0.4);
+  color: var(--tblr-secondary);
+}
+
+.overall-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-block;
+  background: currentColor;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.05);
+  flex: 0 0 auto;
+}
+
+.status-incidents .incident-row {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--tblr-border-color, rgba(255, 255, 255, 0.08));
+  border-radius: 0.5rem;
+  margin-bottom: 0.5rem;
+  background: var(--tblr-bg-surface-secondary, rgba(255, 255, 255, 0.02));
+}
+
+.status-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.status-monitor {
+  padding: 0.85rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--tblr-border-color, rgba(255, 255, 255, 0.08));
+  background: var(--tblr-bg-surface, rgba(0, 0, 0, 0.15));
+}
+
+.status-monitor .monitor-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  background: var(--tblr-secondary);
+}
+.status-monitor[data-state="up"] .monitor-dot { background: #2fb344; box-shadow: 0 0 0 4px rgba(47, 179, 68, 0.15); }
+.status-monitor[data-state="down"] .monitor-dot { background: #d6336c; box-shadow: 0 0 0 4px rgba(214, 51, 108, 0.15); }
+.status-monitor[data-state="unknown"] .monitor-dot { background: #f59f00; box-shadow: 0 0 0 4px rgba(245, 159, 0, 0.15); }
+
+.state-badge { font-weight: 600; }
+.state-up { background-color: #2fb344 !important; color: #fff !important; }
+.state-down { background-color: #d6336c !important; color: #fff !important; }
+.state-unknown { background-color: #f59f00 !important; color: #fff !important; }
+
+.bar-strip {
+  display: flex;
+  gap: 2px;
+  height: 28px;
+  align-items: stretch;
+}
+.bar-strip .bar {
+  flex: 1 1 auto;
+  border-radius: 2px;
+  min-width: 2px;
+  transition: filter 100ms ease;
+  cursor: help;
+}
+.bar-strip .bar:hover { filter: brightness(1.3); }
+.bar-strip .b-ok { background: #2fb344; }
+.bar-strip .b-warn-light { background: #c0d641; }
+.bar-strip .b-warn { background: #f59f00; }
+.bar-strip .b-down { background: #d6336c; }
+.bar-strip .b-none { background: rgba(120, 120, 120, 0.25); }
+
+.status-footer { border-top: 1px solid var(--tblr-border-color, rgba(255, 255, 255, 0.08)); margin-top: 2rem; }
+
+@media (max-width: 540px) {
+  .bar-strip { height: 22px; }
+}

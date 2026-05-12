@@ -1,4 +1,28 @@
 <% var f = filters || {}; var hasAny = total > 0; %>
+<% if (typeof activeMaintenance !== 'undefined' && activeMaintenance.length) { %>
+  <div class="alert alert-warning d-flex align-items-start mb-3" role="alert">
+    <i class="ti ti-tools fs-3 me-2 mt-1"></i>
+    <div class="flex-fill">
+      <div class="fw-medium">
+        <%= activeMaintenance.length === 1 ? 'Maintenance window active' : activeMaintenance.length + ' maintenance windows active' %>
+      </div>
+      <div class="small mt-1">
+        <% activeMaintenance.forEach(function(w, i) { %>
+          <% if (i > 0) { %><br><% } %>
+          <strong><%= w.name %></strong>
+          <span class="text-secondary">
+            (<%= w.scope === 'global' ? 'all monitors' : 'monitor #' + w.scope_value %>,
+            <% if (w.suppress_notifications) { %>alerts silenced<% } %>
+            <% if (w.pause_probes) { %><%= w.suppress_notifications ? ' + ' : '' %>probes paused<% } %><% if (w.ends_at_display) { %>, ends <%= w.ends_at_display %><% } %>)
+          </span>
+        <% }); %>
+      </div>
+    </div>
+    <a href="/settings/maintenance" class="btn btn-sm btn-warning ms-3 align-self-center">
+      <i class="ti ti-settings me-1"></i> Manage
+    </a>
+  </div>
+<% } %>
 <div class="page-header d-print-none mb-4">
   <div class="row g-2 align-items-center">
     <div class="col">
@@ -51,6 +75,10 @@
             { v: '',          l: 'All types', i: 'ti-asterisk' },
             { v: 'active',    l: 'Active',    i: 'ti-world' },
             { v: 'heartbeat', l: 'Heartbeat', i: 'ti-heartbeat' },
+            { v: 'cert',      l: 'Cert',      i: 'ti-certificate' },
+            { v: 'tcp',       l: 'TCP',       i: 'ti-plug-connected' },
+            { v: 'ping',      l: 'Ping',      i: 'ti-wave-saw-tool' },
+            { v: 'dns',       l: 'DNS',       i: 'ti-server-2' },
           ]; %>
           <% types.forEach(function(t) { %>
             <button type="button" class="filter-pill <%= (f.type || '') === t.v ? 'is-active' : '' %>"
@@ -87,6 +115,24 @@
         </div>
       <% } %>
     </div>
+
+    <% if (typeof allTags !== 'undefined' && allTags.length) { %>
+      <div class="d-flex flex-wrap gap-2 align-items-center mt-2 small">
+        <span class="text-secondary me-1"><i class="ti ti-tags"></i> Tags:</span>
+        <% allTags.forEach(function(t) {
+             var active = activeTag && activeTag.id === t.id;
+             var href = active ? '/' : ('/?tag=' + t.id);
+        %>
+          <a href="<%= href %>" class="text-decoration-none">
+            <span class="badge bg-<%= t.color %>-lt <%= active ? 'border border-2 border-' + t.color : '' %>"
+                  style="cursor: pointer;">
+              <i class="ti <%= active ? 'ti-tag-off' : 'ti-tag' %> me-1"></i><%= t.name %>
+              <% if (t.site_count > 0) { %><span class="text-secondary ms-1">(<%= t.site_count %>)</span><% } %>
+            </span>
+          </a>
+        <% }); %>
+      </div>
+    <% } %>
   </div>
 </form>
 
@@ -99,10 +145,28 @@
         <a href="/" class="btn btn-link">Clear filters</a>
       </div>
     </div>
+  <% } else if (typeof isAdmin !== 'undefined' && !isAdmin) { %>
+    <div class="empty">
+      <div class="empty-img">
+        <img src="/branding/logo?v=<%= branding.logoVersion || assetV %>" width="80" height="80" alt="<%= branding.appName %>">
+      </div>
+      <p class="empty-title">No monitors visible to you</p>
+      <p class="empty-subtitle text-secondary">
+        Ask an admin to grant you access to specific monitors,
+        <% if (canCreate) { %> or create your own.<% } else { %> or be promoted to an editor role to create your own.<% } %>
+      </p>
+      <% if (canCreate) { %>
+        <div class="empty-action">
+          <a href="/sites/new" class="btn btn-primary">
+            <i class="ti ti-plus me-1"></i> Create your first monitor
+          </a>
+        </div>
+      <% } %>
+    </div>
   <% } else { %>
     <div class="empty">
       <div class="empty-img">
-        <img src="/branding/logo?v=<%= assetV %>" width="80" height="80" alt="<%= branding.appName %>">
+        <img src="/branding/logo?v=<%= branding.logoVersion || assetV %>" width="80" height="80" alt="<%= branding.appName %>">
       </div>
       <p class="empty-title">No monitors yet</p>
       <p class="empty-subtitle text-secondary">Add your first site or service to start tracking uptime, response time and incidents.</p>
@@ -113,7 +177,22 @@
       </div>
     </div>
   <% } %>
-<% } else { %>
+<% } else {
+     const anyManageable = sites.some(function (s) { return s.canManage; });
+   %>
+  <% if (anyManageable) { %>
+    <div class="d-flex justify-content-end mb-2">
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="bulk-toggle">
+        <i class="ti ti-checkbox me-1"></i> <span data-role="label">Select</span>
+      </button>
+    </div>
+  <% } %>
+
+  <form method="post" action="/sites/bulk" id="bulk-form">
+    <input type="hidden" name="return_to" value="<%= '/' + (qsExceptPage ? '?' + qsExceptPage : '') %>">
+    <input type="hidden" name="action" id="bulk-action" value="">
+    <input type="hidden" name="tag_id" id="bulk-tag-id" value="">
+
   <div class="row row-cards row-cards-tight" id="site-cards">
     <% sites.forEach(function(s) {
         var stateColor = s.paused ? 'secondary' : (s.current_state === 'down' ? 'danger' : (s.current_state === 'up' ? 'success' : 'muted'));
@@ -128,14 +207,19 @@
       <div class="col-12 col-sm-6 col-lg-4 col-xxl-3">
         <div class="card site-card site-card-compact h-100" data-site-id="<%= s.id %>">
           <div class="card-status-start bg-<%= stateColor %>" data-role="stripe"></div>
-          <button type="button"
-                  class="site-card-delete btn btn-icon btn-ghost-danger"
-                  data-site-id="<%= s.id %>"
-                  data-site-name="<%= s.name %>"
-                  title="Delete monitor"
-                  aria-label="Delete monitor">
-            <i class="ti ti-trash"></i>
-          </button>
+          <% if (s.canManage) { %>
+            <label class="site-card-select" data-role="select" hidden>
+              <input type="checkbox" name="site_ids" value="<%= s.id %>" class="form-check-input" form="bulk-form">
+            </label>
+            <button type="button"
+                    class="site-card-delete btn btn-icon btn-ghost-danger"
+                    data-site-id="<%= s.id %>"
+                    data-site-name="<%= s.name %>"
+                    title="Delete monitor"
+                    aria-label="Delete monitor">
+              <i class="ti ti-trash"></i>
+            </button>
+          <% } %>
           <div class="card-body">
             <div class="site-card-head">
               <span class="status-dot status-dot-animated bg-<%= stateColor %>" data-role="dot"></span>
@@ -145,17 +229,45 @@
             <div class="site-meta" title="<%= s.url || '' %>">
               <% if (s.monitor_type === 'heartbeat') { %>
                 <i class="ti ti-heartbeat"></i><span class="site-meta-text">Heartbeat - <%= s.interval_seconds %>s +<%= s.heartbeat_grace_seconds %>s grace</span>
+              <% } else if (s.monitor_type === 'cert') { %>
+                <i class="ti ti-certificate"></i><span class="site-meta-text">TLS cert - <%= s.cert_host || s.url %><% if (s.cert_port && s.cert_port !== 443) { %>:<%= s.cert_port %><% } %></span>
+              <% } else if (s.monitor_type === 'tcp') { %>
+                <i class="ti ti-plug-connected"></i><span class="site-meta-text">TCP - <%= s.tcp_host %>:<%= s.tcp_port %></span>
+              <% } else if (s.monitor_type === 'ping') { %>
+                <i class="ti ti-wave-saw-tool"></i><span class="site-meta-text">Ping - <%= s.ping_host %><% if (s.ping_count > 1) { %> ×<%= s.ping_count %><% } %></span>
+              <% } else if (s.monitor_type === 'dns') { %>
+                <i class="ti ti-server-2"></i><span class="site-meta-text">DNS <%= s.dns_record_type || 'A' %> - <%= s.dns_query %></span>
               <% } else { %>
                 <i class="ti ti-world"></i><span class="site-meta-text"><%= s.url %></span>
               <% } %>
             </div>
 
-            <% var hasFlags = s.cloudflare_mode || s.failure_threshold > 1 || s.paused; %>
+            <%
+              var hasCertBadge = s.last_cert_days_remaining != null && s.cert_expiry_warn_days > 0;
+              var certUrgent = hasCertBadge && s.last_cert_days_remaining <= s.cert_expiry_warn_days;
+              var hasFlags = s.cloudflare_mode || s.failure_threshold > 1 || s.paused || certUrgent;
+            %>
             <% if (hasFlags) { %>
               <div class="site-badges position-relative" style="z-index: 2;">
                 <% if (s.cloudflare_mode) { %><span class="badge bg-orange-lt" title="Cloudflare-aware"><i class="ti ti-shield-check me-1"></i>CF</span><% } %>
                 <% if (s.failure_threshold > 1) { %><span class="badge bg-yellow-lt" title="<%= s.failure_threshold %> consecutive failures before alert">N=<%= s.failure_threshold %></span><% } %>
+                <% if (certUrgent) { %>
+                  <span class="badge bg-<%= s.last_cert_days_remaining < 0 ? 'red' : 'yellow' %>-lt"
+                        title="TLS cert <%= s.last_cert_days_remaining < 0 ? 'expired ' + (-s.last_cert_days_remaining) + ' days ago' : 'expires in ' + s.last_cert_days_remaining + ' days' %>">
+                    <i class="ti ti-certificate me-1"></i><%= s.last_cert_days_remaining < 0 ? 'cert expired' : 'cert ' + s.last_cert_days_remaining + 'd' %>
+                  </span>
+                <% } %>
                 <% if (s.paused) { %><span class="badge bg-secondary-lt"><i class="ti ti-player-pause me-1"></i>paused</span><% } %>
+              </div>
+            <% } %>
+
+            <% if (s.tags && s.tags.length) { %>
+              <div class="site-tags position-relative" style="z-index: 2;">
+                <% s.tags.forEach(function(tg) { %>
+                  <a href="/?tag=<%= tg.id %>" class="text-decoration-none" onclick="event.stopPropagation();">
+                    <span class="badge bg-<%= tg.color %>-lt"><i class="ti ti-tag me-1"></i><%= tg.name %></span>
+                  </a>
+                <% }); %>
               </div>
             <% } %>
 
@@ -239,6 +351,41 @@
       </ul>
     </div>
   <% } %>
+  </form>
+
+  <div class="bulk-bar" id="bulk-bar" hidden>
+    <div class="bulk-bar-inner">
+      <span class="text-secondary me-2">
+        <span id="bulk-count">0</span> selected
+      </span>
+      <button type="button" class="btn btn-sm btn-secondary" data-bulk-action="resume" form="bulk-form">
+        <i class="ti ti-player-play me-1"></i> Resume
+      </button>
+      <button type="button" class="btn btn-sm btn-secondary" data-bulk-action="pause" form="bulk-form">
+        <i class="ti ti-player-pause me-1"></i> Pause
+      </button>
+      <% if (typeof allTags !== 'undefined' && allTags.length) { %>
+        <select class="form-select form-select-sm w-auto" id="bulk-tag-select">
+          <option value="">— tag —</option>
+          <% allTags.forEach(function(tg) { %>
+            <option value="<%= tg.id %>"><%= tg.name %></option>
+          <% }); %>
+        </select>
+        <button type="button" class="btn btn-sm btn-secondary" data-bulk-action="tag_add">
+          <i class="ti ti-tag-plus me-1"></i> Add tag
+        </button>
+        <button type="button" class="btn btn-sm btn-secondary" data-bulk-action="tag_remove">
+          <i class="ti ti-tag-off me-1"></i> Remove tag
+        </button>
+      <% } %>
+      <button type="button" class="btn btn-sm btn-danger ms-auto" data-bulk-action="delete">
+        <i class="ti ti-trash me-1"></i> Delete
+      </button>
+      <button type="button" class="btn btn-sm btn-link" id="bulk-cancel">
+        <i class="ti ti-x"></i>
+      </button>
+    </div>
+  </div>
 <% } %>
 
 <div class="modal" id="confirm-delete-card">
@@ -264,4 +411,4 @@
   </div>
 </div>
 
-<script src="/static/js/dashboard.js"></script>
+<script src="/static/js/dashboard.js?v=<%= assetV %>"></script>

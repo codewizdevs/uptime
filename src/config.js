@@ -46,6 +46,14 @@ const config = {
     user: process.env.ADMIN_USER || 'admin',
     pass: process.env.ADMIN_PASS || 'admin',
   },
+  retention: {
+    checksDays: toInt(process.env.CHECKS_RETENTION_DAYS, 90),
+    incidentsDays: toInt(process.env.INCIDENTS_RETENTION_DAYS, 365),
+    heartbeatPingsDays: toInt(process.env.HEARTBEAT_RETENTION_DAYS, 30),
+    auditDays: toInt(process.env.AUDIT_RETENTION_DAYS, 180),
+    runIntervalHours: toInt(process.env.RETENTION_RUN_INTERVAL_HOURS, 6),
+    vacuum: toBool(process.env.RETENTION_VACUUM, true),
+  },
   paths: {
     root: path.resolve(__dirname, '..'),
     logs: path.resolve(__dirname, '..', 'logs'),

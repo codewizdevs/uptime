@@ -1,0 +1,122 @@
+<%
+  // Overall banner: green if no monitor is down/inconclusive, orange if any down,
+  // red if more than 1/3 of monitors are down.
+  const totalMonitors = groups.reduce((n, g) => n + g.monitors.length, 0);
+  const downCount = groups.reduce((n, g) => n + g.monitors.filter(m => m.current_state === 'down').length, 0);
+  const overall =
+    totalMonitors === 0 ? 'idle' :
+    downCount === 0 ? 'operational' :
+    downCount > totalMonitors / 3 ? 'major' : 'partial';
+  const overallLabel = {
+    operational: 'All systems operational',
+    partial: 'Some systems are experiencing issues',
+    major: 'Major outage in progress',
+    idle: 'No monitors configured yet',
+  }[overall];
+  const overallClass = {
+    operational: 'overall-ok',
+    partial: 'overall-warn',
+    major: 'overall-down',
+    idle: 'overall-idle',
+  }[overall];
+%>
+
+<div class="status-overall <%= overallClass %>">
+  <div class="d-flex align-items-center gap-3">
+    <span class="overall-dot"></span>
+    <div>
+      <div class="fw-semibold fs-3"><%= overallLabel %></div>
+      <% if (overall === 'partial' || overall === 'major') { %>
+        <div class="small opacity-75"><%= downCount %> of <%= totalMonitors %> monitors are reporting issues.</div>
+      <% } else if (overall === 'operational') { %>
+        <div class="small opacity-75">All <%= totalMonitors %> monitors are reporting healthy.</div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<% if (incidents && incidents.length) { %>
+  <section class="status-incidents mt-4">
+    <h2 class="h4 mb-3">Recent incidents</h2>
+    <ul class="list-unstyled m-0">
+      <% incidents.slice(0, 5).forEach(function(inc) { %>
+        <li class="incident-row">
+          <div class="d-flex align-items-baseline gap-2 flex-wrap">
+            <strong><%= inc.site_display_name || inc.site_name %></strong>
+            <% if (!inc.ended_at) { %>
+              <span class="badge bg-red text-white">Ongoing</span>
+            <% } else { %>
+              <span class="badge bg-green text-white">Resolved</span>
+            <% } %>
+            <span class="small text-secondary">
+              <span data-relative-time="<%= inc.started_at %>"><%= inc.started_at %></span>
+              <% if (inc.ended_at) { %> &middot; <%= inc.duration_human %><% } %>
+            </span>
+          </div>
+          <% if (inc.last_error) { %>
+            <div class="small text-secondary mt-1"><code><%= inc.last_error %></code></div>
+          <% } %>
+        </li>
+      <% }) %>
+    </ul>
+  </section>
+<% } %>
+
+<% groups.forEach(function(group) { %>
+  <% if (!group.monitors.length) return; %>
+  <section class="status-group mt-4">
+    <% if (group.name) { %>
+      <h2 class="h4 mb-3"><%= group.name %></h2>
+    <% } %>
+    <div class="status-list">
+      <% group.monitors.forEach(function(m) { %>
+        <article class="status-monitor" data-state="<%= m.current_state %>">
+          <header class="d-flex align-items-baseline gap-2 flex-wrap">
+            <span class="monitor-dot"></span>
+            <strong class="me-auto"><%= m.display_name || m.name %></strong>
+            <span class="badge state-badge state-<%= m.current_state %>">
+              <% if (m.current_state === 'up') { %>Operational
+              <% } else if (m.current_state === 'down') { %>Down
+              <% } else if (m.current_state === 'unknown') { %>Unknown
+              <% } else { %><%= m.current_state %><% } %>
+            </span>
+            <% if (typeof m.uptime_24h === 'number') { %>
+              <span class="small text-secondary"><%= m.uptime_24h.toFixed(2) %>% 24h</span>
+            <% } %>
+          </header>
+
+          <div class="bar-strip mt-2" aria-label="90-day uptime bar">
+            <% m.daily.forEach(function(d) {
+              const cls = d.total === 0 ? 'b-none'
+                : d.uptime_pct >= 100 ? 'b-ok'
+                : d.uptime_pct >= 99 ? 'b-warn-light'
+                : d.uptime_pct >= 95 ? 'b-warn'
+                : 'b-down';
+              const label = d.total === 0
+                ? d.date + ': no data'
+                : d.date + ': ' + d.uptime_pct.toFixed(2) + '% (' + d.up + '/' + (d.up + d.down) + ')';
+            %><span class="bar <%= cls %>" title="<%= label %>"></span><% }) %>
+          </div>
+
+          <% if (m.last_check && m.last_check.checked_at) { %>
+            <footer class="small text-secondary mt-2">
+              Checked <span data-relative-time="<%= m.last_check.checked_at %>"><%= m.last_check.checked_at %></span>
+              <% if (m.last_check.response_time_ms != null && m.current_state === 'up') { %>
+                &middot; <%= m.last_check.response_time_ms %> ms
+              <% } %>
+              <% if (m.current_state === 'down' && m.last_check.error_message) { %>
+                &middot; <span class="text-red"><%= m.last_check.error_message %></span>
+              <% } %>
+            </footer>
+          <% } %>
+        </article>
+      <% }) %>
+    </div>
+  </section>
+<% }) %>
+
+<% if (!totalMonitors) { %>
+  <div class="empty mt-4 text-center text-secondary">
+    <p class="lead">No monitors have been added yet.</p>
+  </div>
+<% } %>

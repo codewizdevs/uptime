@@ -5,6 +5,42 @@ const logger = require('./logger');
 const { runCheck, evaluateHeartbeat } = require('./lib/checker');
 const cf = require('./lib/cloudflare');
 const notifier = require('./notifier');
+const maintenance = require('./lib/maintenance');
+
+const HEARTBEAT_PINGS_KEEP_PER_SITE = 50;
+const HEARTBEAT_BODY_MAX_BYTES = 4096;
+
+function truncateBody(buf) {
+  if (!buf) return null;
+  const s = Buffer.isBuffer(buf) ? buf.toString('utf8') : String(buf);
+  if (!s) return null;
+  if (s.length <= HEARTBEAT_BODY_MAX_BYTES) return s;
+  return s.slice(0, HEARTBEAT_BODY_MAX_BYTES) + `\n…(truncated, ${s.length - HEARTBEAT_BODY_MAX_BYTES} more bytes)`;
+}
+
+async function pruneHeartbeatPings(siteId) {
+  // Keep the latest N rows per site, drop the rest.
+  if (db.dialect === 'sqlite') {
+    await db.query(
+      `DELETE FROM heartbeat_pings
+        WHERE site_id = ? AND id NOT IN (
+          SELECT id FROM heartbeat_pings WHERE site_id = ? ORDER BY id DESC LIMIT ${HEARTBEAT_PINGS_KEEP_PER_SITE}
+        )`,
+      [siteId, siteId]
+    );
+  } else {
+    await db.query(
+      `DELETE p FROM heartbeat_pings p
+         JOIN (
+           SELECT id FROM heartbeat_pings
+            WHERE site_id = ?
+            ORDER BY id DESC
+            LIMIT ?, 1000000
+         ) keep ON keep.id = p.id`,
+      [siteId, HEARTBEAT_PINGS_KEEP_PER_SITE]
+    );
+  }
+}
 
 const INCONCLUSIVE_STREAK_ALERT = 5;
 const WATCHDOG_INTERVAL_MS = 15_000;
@@ -43,9 +79,16 @@ async function recordCheck(site, result) {
 }
 
 async function openIncident(site, error) {
+  // Tag incidents that begin inside a maintenance window so they can be
+  // filtered out of MTBF / availability charts later.
+  let duringMaintenance = 0;
+  try {
+    const w = await maintenance.isActive(site.id);
+    if (w) duringMaintenance = 1;
+  } catch { /* don't block the incident on a lookup failure */ }
   await db.query(
-    `INSERT INTO incidents (site_id, last_error) VALUES (?, ?)`,
-    [site.id, error || null]
+    `INSERT INTO incidents (site_id, last_error, during_maintenance) VALUES (?, ?, ?)`,
+    [site.id, error || null, duringMaintenance]
   );
   await db.query(`UPDATE sites SET current_state='down' WHERE id=?`, [site.id]);
 }
@@ -72,10 +115,72 @@ async function closeOpenIncident(site) {
   return Number(updated[0]?.duration_seconds || 0);
 }
 
+async function persistCertInfo(site, certData) {
+  if (!certData) return;
+  await db.query(
+    `UPDATE sites
+        SET last_cert_subject = ?,
+            last_cert_issuer = ?,
+            last_cert_valid_to = ?,
+            last_cert_days_remaining = ?,
+            last_cert_checked_at = ${db.nowMs()}
+      WHERE id = ?`,
+    [
+      certData.subject || null,
+      certData.issuer || null,
+      certData.valid_to || null,
+      certData.days_remaining == null ? null : certData.days_remaining,
+      site.id,
+    ]
+  );
+}
+
+// Decide whether to fire a cert_expiring alert. We only fire once per
+// (monitor, threshold-band) so we don't spam. Bands:
+//   - >warn_days       → never alerted, alerted_at_days = null
+//   - <=warn_days      → first crossing fires once; subsequent ticks suppress
+//                        unless cert changed (new issuer/subject) or
+//                        days_remaining shrank by a meaningful step (7d/3d/1d/0d)
+function shouldAlertCertExpiry(site, certData) {
+  if (!certData || certData.days_remaining == null) return false;
+  const warnDays = site.cert_expiry_warn_days == null ? 14 : Number(site.cert_expiry_warn_days);
+  const days = Number(certData.days_remaining);
+  if (warnDays <= 0) return false;
+  if (days > warnDays) return false;
+  const lastAlertedDays = site.cert_expiry_alerted_at_days == null
+    ? null
+    : Number(site.cert_expiry_alerted_at_days);
+  if (lastAlertedDays == null) return true;
+  // Re-alert when crossing one of these stricter bands.
+  const bands = [warnDays, 7, 3, 1, 0];
+  for (const band of bands) {
+    if (band <= warnDays && days <= band && lastAlertedDays > band) return true;
+  }
+  return false;
+}
+
+async function markCertAlerted(site, days) {
+  await db.query(
+    `UPDATE sites SET cert_expiry_alerted_at = ${db.nowMs()}, cert_expiry_alerted_at_days = ? WHERE id = ?`,
+    [days, site.id]
+  );
+}
+
 async function processResult(site, result) {
   const s = getState(site.id);
 
   await recordCheck(site, result);
+
+  // Cert side-channel — only saved on successful HTTPS probes or cert-type
+  // monitors. Failures intentionally don't overwrite stale-but-correct data.
+  if (result.cert) {
+    await persistCertInfo(site, result.cert);
+    if (shouldAlertCertExpiry(site, result.cert)) {
+      logger.warn({ siteId: site.id, days: result.cert.days_remaining }, 'monitor.cert_expiring_alert');
+      await notifier.notifyCertExpiring(site, result.cert);
+      await markCertAlerted(site, result.cert.days_remaining);
+    }
+  }
 
   if (result.isUp === null) {
     s.consecutiveInconclusive += 1;
@@ -167,6 +272,18 @@ async function tick(siteId) {
     schedule(site, 60);
     return;
   }
+  // Maintenance window can request that we skip probing entirely (rare —
+  // usually we still probe so the charts are continuous).
+  try {
+    const probeSuppress = await maintenance.isProbeSuppressed(siteId);
+    if (probeSuppress) {
+      logger.trace({ siteId, windowId: probeSuppress.id }, 'monitor.tick_in_maintenance_skip');
+      schedule(site, site.interval_seconds || 60);
+      return;
+    }
+  } catch (err) {
+    logger.warn({ err, siteId }, 'monitor.maintenance_lookup_failed');
+  }
 
   let result;
   try {
@@ -251,14 +368,74 @@ async function checkNow(siteId) {
   return result;
 }
 
-async function recordHeartbeatPing(site) {
-  await db.query(`UPDATE sites SET last_heartbeat_at = ${db.nowMs()} WHERE id = ?`, [site.id]);
+async function recordHeartbeatPing(site, info = {}) {
+  // info shape: { kind: 'start'|'success'|'failure', exitCode?, body?, sourceIp?, userAgent? }
+  const kind = ['start', 'success', 'failure'].includes(info.kind) ? info.kind : 'success';
+  const exitCode = Number.isFinite(info.exitCode) ? info.exitCode : null;
+  const bodySnippet = truncateBody(info.body);
+  const sourceIp = (info.sourceIp || '').slice(0, 64) || null;
+  const userAgent = (info.userAgent || '').slice(0, 255) || null;
+
+  // Compute duration if this is a closing signal (success/failure) and the
+  // previous ping for this site was a 'start'.
+  let durationMs = null;
+  if (kind !== 'start') {
+    const cur = await db.query(
+      `SELECT last_heartbeat_start_at FROM sites WHERE id = ? LIMIT 1`,
+      [site.id]
+    );
+    const startAt = cur[0]?.last_heartbeat_start_at;
+    if (startAt) {
+      const s = new Date(startAt).getTime();
+      if (Number.isFinite(s)) {
+        durationMs = Math.max(0, Date.now() - s);
+      }
+    }
+  }
+
+  await db.query(
+    `INSERT INTO heartbeat_pings
+       (site_id, kind, exit_code, duration_ms, body, source_ip, user_agent)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [site.id, kind, exitCode, durationMs, bodySnippet, sourceIp, userAgent]
+  );
+  await pruneHeartbeatPings(site.id);
+
+  if (kind === 'start') {
+    await db.query(
+      `UPDATE sites
+          SET last_heartbeat_start_at = ${db.nowMs()},
+              last_heartbeat_kind = 'start'
+        WHERE id = ?`,
+      [site.id]
+    );
+    // 'start' is informational only — don't change current_state or fire alerts.
+    return;
+  }
+
+  // 'success' or 'failure' is the terminal signal.
+  await db.query(
+    `UPDATE sites
+        SET last_heartbeat_at = ${db.nowMs()},
+            last_heartbeat_kind = ?,
+            last_heartbeat_exit_code = ?,
+            last_heartbeat_duration_ms = ?,
+            last_heartbeat_body = ?,
+            last_heartbeat_start_at = NULL
+      WHERE id = ?`,
+    [kind, exitCode, durationMs, bodySnippet, site.id]
+  );
+
   const refreshed = await loadSite(site.id);
+  const isUp = kind === 'success' ? 1 : 0;
+  const errorMessage = kind === 'failure'
+    ? `heartbeat reported failure${exitCode != null ? ` (exit ${exitCode})` : ''}`
+    : null;
   await processResult(refreshed, {
-    isUp: 1,
+    isUp,
     statusCode: null,
-    responseTimeMs: null,
-    errorMessage: null,
+    responseTimeMs: durationMs,
+    errorMessage,
     challenged: false,
   });
 }

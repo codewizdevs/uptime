@@ -1,0 +1,213 @@
+<div class="page-header d-print-none mb-3">
+  <div class="row g-2 align-items-center">
+    <div class="col">
+      <h2 class="page-title">Users &amp; roles</h2>
+      <div class="text-secondary mt-1 small">
+        Manage DB-backed accounts. The env super-admin
+        <code><%= reservedUsername %></code> is configured in <code>.env</code> and always works
+        as a break-glass account regardless of what is in this table.
+      </div>
+    </div>
+  </div>
+</div>
+
+<% if (newUser) { %>
+  <div class="alert alert-success">
+    <div class="d-flex align-items-start">
+      <i class="ti ti-key fs-2 me-2"></i>
+      <div class="flex-fill">
+        <div class="fw-medium mb-1">
+          <%= newUser.reset ? 'Password reset for' : 'New user' %> <code><%= newUser.username %></code>
+          <span class="badge bg-secondary-lt ms-1"><%= newUser.role %></span>
+        </div>
+        <div class="text-secondary small mb-2">
+          Show this initial password to the user now — they will be required to choose a new one on first login.
+          This is the only time we display it.
+        </div>
+        <div class="input-group">
+          <input type="text" class="form-control font-monospace" id="new-user-pw" readonly value="<%= newUser.password %>">
+          <button type="button" class="btn btn-success" data-copy="#new-user-pw"><i class="ti ti-copy me-1"></i>Copy</button>
+        </div>
+      </div>
+    </div>
+  </div>
+<% } %>
+
+<div class="row g-3">
+  <div class="col-md-4">
+    <form method="post" action="/settings/users" class="card">
+      <div class="card-header"><h3 class="card-title">New user</h3></div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label required">Username</label>
+          <input type="text" name="username" class="form-control" required
+                 pattern="[a-z0-9_.\-]{2,64}" maxlength="64"
+                 placeholder="alice">
+          <div class="form-hint">2-64 chars, lowercase letters, digits, <code>._-</code>.</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Display name</label>
+          <input type="text" name="display_name" class="form-control" maxlength="120" placeholder="Alice Example">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Email <span class="text-secondary">(optional)</span></label>
+          <input type="email" name="email" class="form-control" maxlength="255" placeholder="alice@example.com">
+        </div>
+        <div class="mb-2">
+          <label class="form-label required">Role</label>
+          <select name="role" class="form-select" required>
+            <option value="viewer">viewer — read-only on granted monitors</option>
+            <option value="editor" selected>editor — create monitors + manage assigned ones</option>
+            <option value="admin">admin — full access to everything</option>
+          </select>
+        </div>
+        <div class="form-hint">
+          A random initial password will be generated. The user must change it on first login.
+        </div>
+      </div>
+      <div class="card-footer text-end">
+        <button type="submit" class="btn btn-primary"><i class="ti ti-user-plus me-1"></i>Create user</button>
+      </div>
+    </form>
+
+    <% if (sitesUnowned > 0) { %>
+      <form method="post" action="/settings/users/claim-unowned" class="card mt-3"
+            onsubmit="return confirm('Assign all <%= sitesUnowned %> unowned monitor(s) to your account?');">
+        <div class="card-body">
+          <div class="text-secondary small mb-2">
+            There <%= sitesUnowned === 1 ? 'is' : 'are' %> <strong><%= sitesUnowned %></strong>
+            monitor<%= sitesUnowned === 1 ? '' : 's' %> with no owner — only admins can currently see
+            <%= sitesUnowned === 1 ? 'it' : 'them' %>.
+          </div>
+          <% if (user && !user.isEnv) { %>
+            <button type="submit" class="btn btn-outline-primary w-100">
+              <i class="ti ti-flag me-1"></i>Claim all unowned as mine
+            </button>
+          <% } else { %>
+            <div class="alert alert-info small mb-0">
+              Sign in as a DB admin (not the env admin) to claim unowned monitors.
+            </div>
+          <% } %>
+        </div>
+      </form>
+    <% } %>
+  </div>
+
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">Existing users (<%= users.length %>)</h3></div>
+      <% if (!users.length) { %>
+        <div class="card-body">
+          <div class="empty">
+            <p class="empty-title">No DB users yet</p>
+            <p class="empty-subtitle text-secondary">Create one to start delegating access.</p>
+          </div>
+        </div>
+      <% } else { %>
+        <div class="table-responsive">
+          <table class="table table-vcenter">
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Role</th>
+                <th>2FA</th>
+                <th>Last login</th>
+                <th class="w-1"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% users.forEach(function(u) { %>
+                <tr>
+                  <td>
+                    <div class="d-flex align-items-center">
+                      <span class="avatar avatar-sm bg-primary-lt text-primary me-2">
+                        <%= u.username.slice(0, 1).toUpperCase() %>
+                      </span>
+                      <div>
+                        <div>
+                          <strong><%= u.username %></strong>
+                          <% if (u.disabled) { %>
+                            <span class="badge bg-red-lt ms-1">disabled</span>
+                          <% } %>
+                          <% if (u.must_change_password) { %>
+                            <span class="badge bg-yellow-lt ms-1" title="Forced password change on next login">pw reset</span>
+                          <% } %>
+                        </div>
+                        <% if (u.display_name) { %>
+                          <div class="text-secondary small"><%= u.display_name %></div>
+                        <% } %>
+                        <% if (u.email) { %>
+                          <div class="text-secondary small"><%= u.email %></div>
+                        <% } %>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <form method="post" action="/settings/users/<%= u.id %>/role" class="m-0 d-flex gap-2 align-items-center">
+                      <select name="role" class="form-select form-select-sm w-auto">
+                        <option value="viewer"<%= u.role === 'viewer' ? ' selected' : '' %>>viewer</option>
+                        <option value="editor"<%= u.role === 'editor' ? ' selected' : '' %>>editor</option>
+                        <option value="admin"<%= u.role === 'admin' ? ' selected' : '' %>>admin</option>
+                      </select>
+                      <button type="submit" class="btn btn-sm btn-outline-primary"><i class="ti ti-check"></i></button>
+                    </form>
+                  </td>
+                  <td>
+                    <% if (u.totp_enabled) { %>
+                      <span class="badge bg-green-lt"><i class="ti ti-shield-check"></i> on</span>
+                    <% } else { %>
+                      <span class="badge bg-secondary-lt">off</span>
+                    <% } %>
+                  </td>
+                  <td class="text-secondary small">
+                    <%= u.last_login_at ? new Date(u.last_login_at).toLocaleString() : 'never' %>
+                    <% if (u.last_login_ip) { %><div class="text-secondary"><%= u.last_login_ip %></div><% } %>
+                  </td>
+                  <td class="text-end">
+                    <div class="btn-group">
+                      <a class="btn btn-sm btn-outline-secondary" href="/settings/users/<%= u.id %>/grants" title="Per-monitor grants">
+                        <i class="ti ti-shield-lock"></i>
+                      </a>
+                      <form method="post" action="/settings/users/<%= u.id %>/reset-password" class="m-0"
+                            onsubmit="return confirm('Generate a fresh password for <%= u.username %>? They will be forced to change it on next login.');">
+                        <button type="submit" class="btn btn-sm btn-outline-warning" title="Reset password"><i class="ti ti-refresh"></i></button>
+                      </form>
+                      <% if (u.totp_enabled) { %>
+                        <form method="post" action="/settings/users/<%= u.id %>/disable-2fa" class="m-0"
+                              onsubmit="return confirm('Disable 2FA for <%= u.username %>? They will sign in with password only afterwards.');">
+                          <button type="submit" class="btn btn-sm btn-outline-warning" title="Disable 2FA"><i class="ti ti-shield-off"></i></button>
+                        </form>
+                      <% } %>
+                      <form method="post" action="/settings/users/<%= u.id %>/toggle-disabled" class="m-0">
+                        <button type="submit" class="btn btn-sm <%= u.disabled ? 'btn-outline-success' : 'btn-outline-secondary' %>"
+                                title="<%= u.disabled ? 'Re-enable account' : 'Disable account' %>">
+                          <i class="ti <%= u.disabled ? 'ti-user-check' : 'ti-user-off' %>"></i>
+                        </button>
+                      </form>
+                      <form method="post" action="/settings/users/<%= u.id %>/delete" class="m-0"
+                            onsubmit="return confirm('Delete user <%= u.username %>? Their grants and API tokens will be removed; their owned monitors become unowned and only admins will see them.');">
+                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete user"><i class="ti ti-trash"></i></button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+
+    <div class="card mt-3">
+      <div class="card-header"><h3 class="card-title">How visibility works</h3></div>
+      <div class="card-body small text-secondary">
+        <ul class="mb-0">
+          <li><strong>admin</strong> — sees and can manage every monitor, no grants needed.</li>
+          <li><strong>editor</strong> — sees only monitors they own or have been granted access to. Can create new ones (they become the owner). Granted <em>manage</em> means full edit/pause/delete on that monitor.</li>
+          <li><strong>viewer</strong> — sees only monitors they were granted <em>view</em> or <em>manage</em> on. Cannot create or edit anything.</li>
+          <li>The env super-admin always sees everything. Disable a DB admin and the env admin remains as break-glass.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>

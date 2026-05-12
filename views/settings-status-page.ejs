@@ -1,0 +1,134 @@
+<div class="page-header d-print-none">
+  <div class="row g-2 align-items-center">
+    <div class="col">
+      <div class="page-pretitle">
+        <a href="/" class="text-secondary text-decoration-none"><i class="ti ti-arrow-left me-1"></i> Dashboard</a>
+      </div>
+      <h2 class="page-title"><i class="ti ti-world me-2"></i> Public status page</h2>
+      <div class="text-secondary mt-1">A read-only page anyone can visit to see service health. Optionally protected by an access token.</div>
+    </div>
+    <div class="col-auto">
+      <a href="/status<%= !settings.public && settings.token ? '?token=' + encodeURIComponent(settings.token) : '' %>"
+         target="_blank" rel="noopener" class="btn btn-outline-primary">
+        <i class="ti ti-external-link me-1"></i> Open status page
+      </a>
+    </div>
+  </div>
+</div>
+
+<form method="post" action="/settings/status-page" class="card mb-3">
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Page title</label>
+        <input type="text" name="title" class="form-control" maxlength="255"
+               value="<%= settings.title || '' %>" placeholder="<%= branding.appName + ' status' %>">
+        <div class="form-hint">Shown in the page header and the browser tab. Defaults to "<%= branding.appName %> status".</div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-check form-switch mt-4">
+          <input class="form-check-input" type="checkbox" name="enabled" value="1" <%= settings.enabled ? 'checked' : '' %>>
+          <span class="form-check-label">Status page enabled</span>
+        </label>
+        <div class="form-hint">When off, <code>/status</code> returns 404 to all visitors.</div>
+      </div>
+      <div class="col-12">
+        <label class="form-label">Description (optional)</label>
+        <textarea name="description" class="form-control" rows="2" maxlength="2000"
+                  placeholder="Status of our public APIs and websites."><%= settings.description || '' %></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-body border-top">
+    <h3 class="card-title">Access</h3>
+    <div class="row g-3">
+      <div class="col-md-12">
+        <div class="form-selectgroup">
+          <label class="form-selectgroup-item">
+            <input type="radio" name="public_mode" value="public" class="form-selectgroup-input" <%= settings.public ? 'checked' : '' %>>
+            <span class="form-selectgroup-label">
+              <i class="ti ti-world me-1"></i> Public — anyone with the URL can view
+            </span>
+          </label>
+          <label class="form-selectgroup-item">
+            <input type="radio" name="public_mode" value="private" class="form-selectgroup-input" <%= settings.public ? '' : 'checked' %>>
+            <span class="form-selectgroup-label">
+              <i class="ti ti-lock me-1"></i> Private — token required (<code>?token=…</code>)
+            </span>
+          </label>
+        </div>
+      </div>
+      <div class="col-md-12">
+        <label class="form-label">Access token</label>
+        <div class="input-group">
+          <input type="text" name="token" class="form-control" value="<%= settings.token %>"
+                 placeholder="(auto-generated when private)" autocomplete="off">
+          <button type="button" class="btn btn-outline-secondary" data-copy
+                  data-copy-value="<%= publicBaseUrl %>/status?token=<%= encodeURIComponent(settings.token || '') %>">
+            <i class="ti ti-copy me-1"></i> Copy URL
+          </button>
+        </div>
+        <div class="form-hint">
+          Only used when access is set to <strong>Private</strong>. Share the full URL above with viewers.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-footer text-end">
+    <button type="submit" class="btn btn-primary">Save</button>
+  </div>
+</form>
+
+<% if (!settings.public) { %>
+<form method="post" action="/settings/status-page/regenerate-token" class="card mb-3">
+  <div class="card-body d-flex align-items-center gap-3">
+    <div class="me-auto">
+      <strong>Rotate access token</strong>
+      <div class="form-hint mb-0">Invalidates the current URL. Anyone with the old link will lose access.</div>
+    </div>
+    <button type="submit" class="btn btn-outline-danger">
+      <i class="ti ti-refresh me-1"></i> Generate new token
+    </button>
+  </div>
+</form>
+<% } %>
+
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">Groups currently visible</h3>
+    <div class="card-actions">
+      <span class="badge bg-secondary-lt"><%= groups.length %></span>
+    </div>
+  </div>
+  <div class="card-body">
+    <% if (!groups.length) { %>
+      <p class="text-secondary m-0">No monitors are visible yet. Edit a monitor and untick "Hide from public status page" to show it here, or set a group name to organize them.</p>
+    <% } else { %>
+      <ul class="list-group list-group-flush mt-2">
+        <% groups.forEach(function(g) { %>
+          <li class="list-group-item d-flex align-items-baseline">
+            <span><%= g.name %></span>
+            <span class="ms-auto badge bg-secondary-lt"><%= g.count %></span>
+          </li>
+        <% }) %>
+      </ul>
+      <p class="form-hint mt-2 mb-0">Tip: groups are just labels — set the same "Group" value on multiple monitors and they will render under one heading.</p>
+    <% } %>
+  </div>
+</div>
+
+<script>
+(function () {
+  document.querySelectorAll('[data-copy]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var v = btn.getAttribute('data-copy-value') || '';
+      if (!v) return;
+      navigator.clipboard?.writeText(v).then(function () {
+        if (window.notyf) window.notyf.success('Link copied to clipboard');
+      });
+    });
+  });
+})();
+</script>

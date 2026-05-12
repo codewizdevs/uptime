@@ -23,7 +23,7 @@
     <div class="container container-tight py-4">
       <div class="text-center mb-4">
         <a href="/" class="d-inline-flex align-items-center text-decoration-none">
-          <img src="/branding/logo?v=<%= typeof assetV !== 'undefined' ? assetV : Date.now() %>" width="56" height="56" alt="<%= branding.appName %>">
+          <img src="/branding/logo?v=<%= (typeof branding !== 'undefined' && branding.logoVersion) || (typeof assetV !== 'undefined' ? assetV : Date.now()) %>" width="56" height="56" alt="<%= branding.appName %>">
         </a>
         <h1 class="h2 mt-3 mb-0"><%= branding.appName %></h1>
         <div class="text-secondary small">Sign in to continue</div>
@@ -56,6 +56,6 @@
       warning: (typeof flash !== 'undefined' && flash.warning) || [],
     }).replace(/</g, '\\u003c').replace(/-->/g, '--\\u003e') %>;
   </script>
-  <script src="/static/js/notyf-init.js"></script>
+  <script src="/static/js/notyf-init.js?v=<%= typeof assetV !== 'undefined' ? assetV : Date.now() %>"></script>
 </body>
 </html>

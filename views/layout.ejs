@@ -6,8 +6,8 @@
   <meta name="referrer" content="no-referrer">
   <title><%= typeof title !== 'undefined' ? title + ' - ' + branding.appName : branding.appName %></title>
 
-  <link rel="icon" href="/branding/favicon?v=<%= assetV %>">
-  <link rel="apple-touch-icon" href="/branding/favicon?v=<%= assetV %>">
+  <link rel="icon" href="/branding/favicon?v=<%= branding.faviconVersion || assetV %>">
+  <link rel="apple-touch-icon" href="/branding/favicon?v=<%= branding.faviconVersion || assetV %>">
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta20/dist/css/tabler.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.34.0/dist/tabler-icons.min.css">
@@ -44,9 +44,9 @@
       warning: (typeof flash !== 'undefined' && flash.warning) || [],
     }).replace(/</g, '\\u003c').replace(/-->/g, '--\\u003e') %>;
   </script>
-  <script src="/static/js/notyf-init.js"></script>
-  <script src="/static/js/theme.js"></script>
-  <script src="/static/js/modal.js"></script>
-  <script src="/static/js/dropdown.js"></script>
+  <script src="/static/js/notyf-init.js?v=<%= assetV %>"></script>
+  <script src="/static/js/theme.js?v=<%= assetV %>"></script>
+  <script src="/static/js/modal.js?v=<%= assetV %>"></script>
+  <script src="/static/js/dropdown.js?v=<%= assetV %>"></script>
 </body>
 </html>

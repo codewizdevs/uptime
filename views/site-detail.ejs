@@ -19,25 +19,50 @@
         <% if (site.paused) { %>
           <span class="badge bg-secondary-lt">paused</span>
         <% } %>
+        <% if (site.mute_notifications) { %>
+          <span class="badge bg-warning-lt" title="Probe runs but no alerts fire"><i class="ti ti-bell-off me-1"></i>muted</span>
+        <% } %>
+        <% if (typeof siteTags !== 'undefined' && siteTags.length) { %>
+          <% siteTags.forEach(function(t) { %>
+            <a href="/?tag=<%= t.id %>" class="text-decoration-none" onclick="event.stopPropagation();">
+              <span class="badge bg-<%= t.color %>-lt"><i class="ti ti-tag me-1"></i><%= t.name %></span>
+            </a>
+          <% }); %>
+        <% } %>
       </h2>
       <% if (site.monitor_type === 'active') { %>
         <div class="text-secondary text-truncate"><a href="<%= site.url %>" target="_blank" rel="noopener" class="text-secondary"><%= site.url %></a></div>
       <% } %>
     </div>
     <div class="col-auto d-flex gap-2">
-      <form method="post" action="/sites/<%= site.id %>/check-now" class="d-inline">
-        <button type="submit" class="btn btn-outline-primary"><i class="ti ti-refresh me-1"></i> Check now</button>
-      </form>
-      <form method="post" action="/sites/<%= site.id %>/pause" class="d-inline">
-        <button type="submit" class="btn btn-outline-secondary">
-          <i class="ti ti-<%= site.paused ? 'player-play' : 'player-pause' %> me-1"></i>
-          <%= site.paused ? 'Resume' : 'Pause' %>
-        </button>
-      </form>
-      <a href="/sites/<%= site.id %>/edit" class="btn btn-primary"><i class="ti ti-edit me-1"></i> Edit</a>
+      <% if (typeof canManage !== 'undefined' && canManage) { %>
+        <form method="post" action="/sites/<%= site.id %>/check-now" class="d-inline">
+          <button type="submit" class="btn btn-outline-primary"><i class="ti ti-refresh me-1"></i> Check now</button>
+        </form>
+        <form method="post" action="/sites/<%= site.id %>/pause" class="d-inline">
+          <button type="submit" class="btn btn-outline-secondary">
+            <i class="ti ti-<%= site.paused ? 'player-play' : 'player-pause' %> me-1"></i>
+            <%= site.paused ? 'Resume' : 'Pause' %>
+          </button>
+        </form>
+        <a href="/sites/<%= site.id %>/edit" class="btn btn-primary"><i class="ti ti-edit me-1"></i> Edit</a>
+      <% } else { %>
+        <span class="badge bg-secondary-lt"><i class="ti ti-eye me-1"></i>View only</span>
+      <% } %>
     </div>
   </div>
 </div>
+
+<% if (site.notes && site.notes.trim()) { %>
+  <div class="card mb-3">
+    <div class="card-body py-3">
+      <div class="d-flex align-items-start">
+        <i class="ti ti-notes fs-3 me-2 text-secondary mt-1"></i>
+        <div class="flex-fill small" style="white-space: pre-wrap; word-break: break-word;"><%= site.notes %></div>
+      </div>
+    </div>
+  </div>
+<% } %>
 
 <% if (typeof attachedChannels !== 'undefined' && attachedChannels.length > 0) { %>
   <div class="card mb-3 attached-channels-card">
@@ -52,10 +77,94 @@
             <%= c.name %>
           </a>
         <% }); %>
-        <a href="/sites/<%= site.id %>/edit#channels" class="text-secondary small ms-auto text-decoration-none">
-          <i class="ti ti-edit me-1"></i> change
-        </a>
+        <% if (typeof canManage !== 'undefined' && canManage) { %>
+          <a href="/sites/<%= site.id %>/edit#channels" class="text-secondary small ms-auto text-decoration-none">
+            <i class="ti ti-edit me-1"></i> change
+          </a>
+        <% } %>
       </div>
+    </div>
+  </div>
+<% } %>
+
+<% if (typeof canShare !== 'undefined' && canShare) { %>
+  <div class="card mb-3">
+    <div class="card-header">
+      <h3 class="card-title">Sharing</h3>
+      <div class="card-actions text-secondary small">
+        Owner:
+        <% if (ownerUser) { %>
+          <strong><%= ownerUser.username %></strong>
+          <% if (ownerUser.disabled) { %><span class="badge bg-red-lt ms-1">disabled</span><% } %>
+        <% } else { %>
+          <em>none (admin-only)</em>
+        <% } %>
+      </div>
+    </div>
+    <div class="card-body">
+      <% if (!siteGrants.length) { %>
+        <div class="text-secondary small mb-3">No additional users have access to this monitor.</div>
+      <% } else { %>
+        <div class="table-responsive mb-3">
+          <table class="table table-vcenter table-sm card-table">
+            <thead><tr><th>User</th><th>Permission</th><th>Since</th><th class="w-1"></th></tr></thead>
+            <tbody>
+              <% siteGrants.forEach(function(g) { %>
+                <tr>
+                  <td>
+                    <strong><%= g.username %></strong>
+                    <% if (g.disabled) { %><span class="badge bg-red-lt ms-1">disabled</span><% } %>
+                    <% if (g.display_name) { %><span class="text-secondary small ms-1"><%= g.display_name %></span><% } %>
+                  </td>
+                  <td>
+                    <span class="badge bg-<%= g.permission === 'manage' ? 'orange' : 'blue' %>-lt"><%= g.permission %></span>
+                  </td>
+                  <td class="text-secondary small"><%= g.granted_at ? new Date(g.granted_at).toLocaleString() : '' %></td>
+                  <td class="text-end">
+                    <form method="post" action="/sites/<%= site.id %>/grants/<%= g.user_id %>/delete" class="m-0"
+                          onsubmit="return confirm('Revoke access for <%= g.username %>?');">
+                      <button type="submit" class="btn btn-sm btn-outline-danger" title="Revoke">
+                        <i class="ti ti-trash"></i>
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+
+      <% if (eligibleUsers && eligibleUsers.length) { %>
+        <form method="post" action="/sites/<%= site.id %>/grants" class="row g-2 align-items-end">
+          <div class="col-md-6">
+            <label class="form-label">Grant access to</label>
+            <select name="user_id" class="form-select" required>
+              <option value="">Select a user…</option>
+              <% eligibleUsers.forEach(function(u) { %>
+                <option value="<%= u.id %>"><%= u.username %> (<%= u.role %>)</option>
+              <% }); %>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Permission</label>
+            <select name="permission" class="form-select">
+              <option value="view">View</option>
+              <option value="manage">Manage</option>
+            </select>
+          </div>
+          <div class="col-md-3 text-end">
+            <button type="submit" class="btn btn-primary"><i class="ti ti-user-plus me-1"></i>Grant</button>
+          </div>
+          <div class="col-12 form-hint">
+            View grants let the user see this monitor; manage grants also let them pause, edit and delete it.
+          </div>
+        </form>
+      <% } else { %>
+        <div class="text-secondary small">
+          No other DB users available. <a href="/settings/users" class="text-decoration-none">Create a user</a> to share with.
+        </div>
+      <% } %>
     </div>
   </div>
 <% } %>
@@ -65,22 +174,79 @@
     <div class="card-body">
       <div class="row align-items-center g-2">
         <div class="col-md-7">
-          <div class="text-secondary small mb-1"><i class="ti ti-heartbeat me-1"></i> Heartbeat ping URL</div>
-          <div class="input-group">
+          <div class="text-secondary small mb-1"><i class="ti ti-heartbeat me-1"></i> Heartbeat ping URLs</div>
+          <div class="input-group mb-1">
+            <span class="input-group-text" style="min-width: 5.25rem;">success</span>
             <input type="text" class="form-control font-monospace" id="ping-url" readonly value="<%= publicBaseUrl %>/ping/<%= site.heartbeat_token %>">
-            <button type="button" class="btn" data-copy="#ping-url"><i class="ti ti-copy"></i> Copy</button>
+            <button type="button" class="btn" data-copy="#ping-url"><i class="ti ti-copy"></i></button>
+          </div>
+          <div class="input-group mb-1">
+            <span class="input-group-text" style="min-width: 5.25rem;">start</span>
+            <input type="text" class="form-control font-monospace" id="ping-url-start" readonly value="<%= publicBaseUrl %>/ping/<%= site.heartbeat_token %>/start">
+            <button type="button" class="btn" data-copy="#ping-url-start"><i class="ti ti-copy"></i></button>
+          </div>
+          <div class="input-group">
+            <span class="input-group-text" style="min-width: 5.25rem;">fail</span>
+            <input type="text" class="form-control font-monospace" id="ping-url-fail" readonly value="<%= publicBaseUrl %>/ping/<%= site.heartbeat_token %>/fail">
+            <button type="button" class="btn" data-copy="#ping-url-fail"><i class="ti ti-copy"></i></button>
           </div>
           <div class="form-hint mt-2">
-            Have your service <code>GET</code> this URL every <strong><%= site.interval_seconds %>s</strong> (grace <%= site.heartbeat_grace_seconds %>s).
+            <% if (site.heartbeat_schedule_kind === 'cron' && site.heartbeat_cron) { %>
+              Expect pings on cron <code><%= site.heartbeat_cron %></code> (<%= site.heartbeat_timezone || 'UTC' %>), grace <%= site.heartbeat_grace_seconds %>s.
+            <% } else { %>
+              Have your service <code>GET</code> this URL every <strong><%= site.interval_seconds %>s</strong> (grace <%= site.heartbeat_grace_seconds %>s).
+            <% } %>
+            For wrapped jobs: ping <code>/start</code> first, then <code>/0</code> on success or <code>/&lt;rc&gt;</code> on failure. POST/PUT body up to 4 KB is captured.
           </div>
         </div>
         <div class="col-md-5">
           <div class="text-secondary small mb-1">Cron one-liner</div>
-          <pre class="bg-body-tertiary p-2 small mb-0" style="white-space: pre-wrap;">* * * * * curl -fsS <%= publicBaseUrl %>/ping/<%= site.heartbeat_token %> > /dev/null</pre>
+          <pre class="bg-body-tertiary p-2 small mb-0" style="white-space: pre-wrap;"><%= site.heartbeat_schedule_kind === 'cron' && site.heartbeat_cron ? site.heartbeat_cron : '* * * * *' %> curl -fsS <%= publicBaseUrl %>/ping/<%= site.heartbeat_token %> > /dev/null</pre>
+          <div class="text-secondary small mt-2 mb-1">Wrap a job</div>
+          <pre class="bg-body-tertiary p-2 small mb-0" style="white-space: pre-wrap;">curl -fsS <%= publicBaseUrl %>/ping/<%= site.heartbeat_token %>/start
+my-job 2>&amp;1 | tee /tmp/job.log
+RC=$?
+curl -fsS --data-binary @/tmp/job.log <%= publicBaseUrl %>/ping/<%= site.heartbeat_token %>/$RC</pre>
         </div>
       </div>
     </div>
   </div>
+
+  <% if (typeof recentPings !== 'undefined' && recentPings.length) { %>
+    <div class="card mb-3">
+      <div class="card-header"><h3 class="card-title">Recent pings (last <%= recentPings.length %>)</h3></div>
+      <div class="table-responsive">
+        <table class="table table-vcenter table-sm card-table">
+          <thead><tr>
+            <th>When</th><th>Kind</th><th>Exit</th><th>Duration</th><th>Body</th><th>Source</th>
+          </tr></thead>
+          <tbody>
+            <% recentPings.forEach(function(p) { %>
+              <tr>
+                <td class="text-secondary small text-nowrap"><%= new Date(p.received_at).toLocaleString() %></td>
+                <td>
+                  <% if (p.kind === 'start') { %><span class="badge bg-blue-lt">start</span>
+                  <% } else if (p.kind === 'success') { %><span class="badge bg-success-lt">success</span>
+                  <% } else { %><span class="badge bg-danger-lt">failure</span>
+                  <% } %>
+                </td>
+                <td class="font-monospace small"><%= p.exit_code != null ? p.exit_code : '-' %></td>
+                <td class="text-secondary small"><%= p.duration_ms != null ? p.duration_ms + ' ms' : '-' %></td>
+                <td>
+                  <% if (p.body) { %>
+                    <code class="small d-inline-block text-truncate" style="max-width: 320px;" title="<%= p.body %>"><%= p.body.split('\n')[0].slice(0, 80) %></code>
+                  <% } else { %>
+                    <span class="text-secondary">-</span>
+                  <% } %>
+                </td>
+                <td class="text-secondary small text-nowrap"><%= p.source_ip || '-' %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <% } %>
 <% } %>
 
 <div class="row row-cards mb-3">
@@ -150,7 +316,12 @@
 <div class="row row-cards">
   <div class="col-lg-6">
     <div class="card">
-      <div class="card-header"><h3 class="card-title">Recent checks</h3></div>
+      <div class="card-header d-flex align-items-center">
+        <h3 class="card-title mb-0">Recent checks</h3>
+        <a href="/sites/<%= site.id %>/checks.csv" class="ms-auto btn btn-sm btn-outline-secondary" title="Download up to 5000 most-recent checks as CSV">
+          <i class="ti ti-file-download me-1"></i>CSV
+        </a>
+      </div>
       <div class="table-responsive">
         <table class="table table-vcenter table-sm card-table">
           <thead><tr>
@@ -185,7 +356,12 @@
 
   <div class="col-lg-6">
     <div class="card">
-      <div class="card-header"><h3 class="card-title">Incidents</h3></div>
+      <div class="card-header d-flex align-items-center">
+        <h3 class="card-title mb-0">Incidents</h3>
+        <a href="/sites/<%= site.id %>/incidents.csv" class="ms-auto btn btn-sm btn-outline-secondary" title="Download all incidents as CSV">
+          <i class="ti ti-file-download me-1"></i>CSV
+        </a>
+      </div>
       <div class="table-responsive">
         <table class="table table-vcenter table-sm card-table">
           <thead><tr>
@@ -235,5 +411,5 @@
 <% if (site.monitor_type === 'active') { %>
   <script>window.__siteId = <%= site.id %>;</script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-  <script src="/static/js/site-detail.js"></script>
+  <script src="/static/js/site-detail.js?v=<%= assetV %>"></script>
 <% } %>

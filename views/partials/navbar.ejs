@@ -2,12 +2,15 @@
   <div class="container-xl">
     <h1 class="navbar-brand navbar-brand-autodark d-none-navbar-horizontal pe-0 pe-md-3 mb-0">
       <a href="/" class="d-flex align-items-center text-decoration-none">
-        <img src="/branding/logo?v=<%= assetV %>" width="36" height="36" alt="<%= branding.appName %>" class="me-2">
+        <img src="/branding/logo?v=<%= branding.logoVersion || assetV %>" width="36" height="36" alt="<%= branding.appName %>" class="me-2">
         <span class="fw-semibold fs-3 text-body"><%= branding.appName %></span>
       </a>
     </h1>
 
-    <% if (typeof user !== 'undefined' && user) { %>
+    <% if (typeof user !== 'undefined' && user) {
+         const isAdmin = user.role === 'admin' || user.isEnv;
+         const canCreate = isAdmin || user.role === 'editor';
+       %>
       <div class="d-flex align-items-center ms-auto navbar-actions">
         <div class="dropdown-wrap">
           <button id="settings-toggle" class="btn btn-icon btn-ghost-secondary"
@@ -15,11 +18,29 @@
             <i class="ti ti-settings"></i>
           </button>
           <div class="dropdown-menu" id="settings-menu" role="menu">
-            <div class="dropdown-header">Configuration</div>
-            <a class="dropdown-item" href="/channels"><i class="ti ti-bell me-2"></i> Notification channels</a>
-            <a class="dropdown-item" href="/settings/smtp"><i class="ti ti-mail me-2"></i> Email (SMTP)</a>
+            <% if (isAdmin) { %>
+              <div class="dropdown-header">Administration</div>
+              <a class="dropdown-item" href="/settings/users"><i class="ti ti-users me-2"></i> Users &amp; roles</a>
+              <a class="dropdown-item" href="/channels"><i class="ti ti-bell me-2"></i> Notification channels</a>
+              <a class="dropdown-item" href="/settings/smtp"><i class="ti ti-mail me-2"></i> Email (SMTP)</a>
+              <a class="dropdown-item" href="/settings/status-page"><i class="ti ti-world me-2"></i> Public status page</a>
+              <a class="dropdown-item" href="/settings/maintenance"><i class="ti ti-tools me-2"></i> Maintenance windows</a>
+              <a class="dropdown-item" href="/settings/tags"><i class="ti ti-tags me-2"></i> Tags</a>
+              <a class="dropdown-item" href="/settings/api-tokens"><i class="ti ti-key me-2"></i> API tokens (all)</a>
+              <% if (user.isEnv) { %>
+                <a class="dropdown-item" href="/settings/2fa"><i class="ti ti-shield-lock me-2"></i> Env admin 2FA</a>
+              <% } %>
+              <a class="dropdown-item" href="/settings/branding"><i class="ti ti-paint me-2"></i> Branding &amp; whitelabel</a>
+              <a class="dropdown-item" href="/settings/backup"><i class="ti ti-file-zip me-2"></i> Backup &amp; restore</a>
+              <div class="dropdown-divider"></div>
+            <% } %>
+            <div class="dropdown-header">My account</div>
+            <a class="dropdown-item" href="/settings/account"><i class="ti ti-user-cog me-2"></i> Password, 2FA &amp; tokens</a>
+            <a class="dropdown-item" href="/settings/audit"><i class="ti ti-list-details me-2"></i> Audit log<% if (!isAdmin) { %> (mine)<% } %></a>
             <div class="dropdown-divider"></div>
-            <a class="dropdown-item" href="/settings/backup"><i class="ti ti-file-zip me-2"></i> Backup &amp; restore</a>
+            <a class="dropdown-item" href="/status" target="_blank" rel="noopener">
+              <i class="ti ti-external-link me-2"></i> View public status page
+            </a>
           </div>
         </div>
 
@@ -28,9 +49,11 @@
           <i class="ti ti-moon theme-icon-dark"></i>
         </button>
 
-        <a href="/sites/new" class="btn btn-primary">
-          <i class="ti ti-plus me-1"></i> New monitor
-        </a>
+        <% if (canCreate) { %>
+          <a href="/sites/new" class="btn btn-primary">
+            <i class="ti ti-plus me-1"></i> New monitor
+          </a>
+        <% } %>
 
         <span class="navbar-divider"></span>
 
@@ -38,7 +61,14 @@
           <span class="avatar avatar-sm bg-primary-lt text-primary fw-semibold">
             <%= user.username.slice(0, 1).toUpperCase() %>
           </span>
-          <span class="user-chip-name d-none d-md-inline"><%= user.username %></span>
+          <span class="user-chip-name d-none d-md-inline">
+            <%= user.username %>
+            <% if (!user.isEnv && user.role) { %>
+              <span class="badge bg-secondary-lt ms-1"><%= user.role %></span>
+            <% } else if (user.isEnv) { %>
+              <span class="badge bg-yellow-lt ms-1" title="Configured via .env">env</span>
+            <% } %>
+          </span>
           <form method="post" action="/logout" class="m-0">
             <button type="submit" class="btn btn-icon btn-logout" title="Sign out" aria-label="Sign out">
               <i class="ti ti-logout-2"></i>

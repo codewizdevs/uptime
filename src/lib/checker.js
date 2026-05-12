@@ -4,6 +4,10 @@ const zlib = require('zlib');
 const { promisify } = require('util');
 const { Agent, request } = require('undici');
 const cf = require('./cloudflare');
+const cert = require('./cert');
+const tcpProbe = require('./tcp');
+const pingProbe = require('./ping');
+const dnsProbe = require('./dnscheck');
 const logger = require('../logger');
 
 const gunzipAsync = promisify(zlib.gunzip);
@@ -94,21 +98,66 @@ function buildHeaders(site) {
       for (const [k, v] of Object.entries(extra)) headers[k] = String(v);
     }
   }
+  // Per-monitor auth — explicit fields beat any Authorization in request_headers.
+  if (site.auth_type === 'basic' && site.auth_username != null) {
+    const user = String(site.auth_username || '');
+    const pass = String(site.auth_password || '');
+    headers.Authorization = 'Basic ' + Buffer.from(`${user}:${pass}`).toString('base64');
+  } else if (site.auth_type === 'bearer' && site.auth_token) {
+    headers.Authorization = `Bearer ${String(site.auth_token).trim()}`;
+  }
   return headers;
 }
 
-async function fetchWithTiming({ method, url, headers, timeoutMs }) {
+// Cache dispatchers per (skip-tls, max-redirects) tuple so we don't churn TCP
+// connections when many monitors share the same probe options.
+const tlsRelaxedAgents = new Map();
+function dispatcherFor(site) {
+  if (!site.skip_tls_verify) return sharedAgent;
+  const key = 'skip-tls';
+  let a = tlsRelaxedAgents.get(key);
+  if (!a) {
+    a = new Agent({
+      keepAliveTimeout: 30_000,
+      keepAliveMaxTimeout: 60_000,
+      connections: 16,
+      pipelining: 1,
+      connect: { rejectUnauthorized: false },
+    });
+    tlsRelaxedAgents.set(key, a);
+  }
+  return a;
+}
+
+function pickRequestBody(site) {
+  const m = (site.method || 'GET').toUpperCase();
+  if (m === 'GET' || m === 'HEAD') return { body: null, contentType: null };
+  const body = site.request_body;
+  if (body == null || body === '') return { body: null, contentType: null };
+  const t = (site.request_body_type || 'text').toLowerCase();
+  let contentType = null;
+  if (t === 'json') contentType = 'application/json';
+  else if (t === 'form') contentType = 'application/x-www-form-urlencoded';
+  else if (t === 'text') contentType = 'text/plain; charset=utf-8';
+  return { body: String(body), contentType };
+}
+
+async function fetchWithTiming({ method, url, headers, timeoutMs, body: requestBody, maxRedirections, dispatcher }) {
   const start = process.hrtime.bigint();
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(new Error('timeout')), timeoutMs);
   try {
-    const res = await request(url, {
+    const opts = {
       method,
       headers,
-      dispatcher: sharedAgent,
+      dispatcher: dispatcher || sharedAgent,
       signal: ac.signal,
-      maxRedirections: 5,
-    });
+      maxRedirections: Number.isFinite(maxRedirections) ? maxRedirections : 5,
+    };
+    if (requestBody != null && requestBody !== '' && method !== 'GET' && method !== 'HEAD') {
+      opts.body = requestBody;
+    }
+    const res = await request(url, opts);
     const headersObj = {};
     for (const [k, v] of Object.entries(res.headers)) {
       headersObj[k.toLowerCase()] = Array.isArray(v) ? v.join(', ') : v;
@@ -134,8 +183,128 @@ async function fetchWithTiming({ method, url, headers, timeoutMs }) {
   }
 }
 
+// Run a TLS handshake against the URL's host:port (best-effort, swallowing
+// errors) and return summarized cert info. We intentionally pass
+// rejectUnauthorized=false here so we can still surface info about an
+// expired or self-signed cert.
+async function captureCertSideChannel(site) {
+  try {
+    if (!site || !site.url || !/^https:\/\//i.test(site.url)) return null;
+    const info = await cert.inspect(site.url, { timeoutMs: 4000, rejectUnauthorized: false });
+    return info?.cert || null;
+  } catch (err) {
+    logger.trace({ err, siteId: site?.id }, 'cert.side_channel_failed');
+    return null;
+  }
+}
+
+// Cert-only monitor: just open a TLS handshake and assert validity.
+// Configurable host/port via cert_host / cert_port; falls back to URL.
+async function runCertCheck(site) {
+  const log = logger.child({ siteId: site.id, siteName: site.name, monitorType: 'cert' });
+  const target = (site.cert_host && site.cert_port)
+    ? `${site.cert_host}:${site.cert_port}`
+    : (site.cert_host || site.url || '');
+  if (!target) {
+    return { isUp: 0, statusCode: null, responseTimeMs: null, errorMessage: 'no host configured', challenged: false, cert: null };
+  }
+  const start = process.hrtime.bigint();
+  try {
+    const info = await cert.inspect(target, {
+      timeoutMs: Math.max(2000, site.timeout_ms || 10000),
+      // We want to know about expired certs, so don't auto-reject; but if
+      // the user really wants strict mode they can set cloudflare_mode-like
+      // semantics later. For now, info is authoritative.
+      rejectUnauthorized: false,
+    });
+    const ms = Number((process.hrtime.bigint() - start) / 1_000_000n);
+    const c = info.cert;
+    if (!c) {
+      return { isUp: 0, statusCode: null, responseTimeMs: ms, errorMessage: 'no cert returned', challenged: false, cert: null };
+    }
+    if (c.days_remaining == null) {
+      return { isUp: 0, statusCode: null, responseTimeMs: ms, errorMessage: 'cert missing valid_to', challenged: false, cert: c };
+    }
+    if (c.days_remaining < 0) {
+      return { isUp: 0, statusCode: null, responseTimeMs: ms, errorMessage: `cert expired ${-c.days_remaining} days ago`, challenged: false, cert: c };
+    }
+    return { isUp: 1, statusCode: null, responseTimeMs: ms, errorMessage: null, challenged: false, cert: c };
+  } catch (err) {
+    const ms = Number((process.hrtime.bigint() - start) / 1_000_000n);
+    log.debug({ err: err?.message }, 'cert.check_failed');
+    return { isUp: 0, statusCode: null, responseTimeMs: ms, errorMessage: `tls: ${err?.message || err}`, challenged: false, cert: null };
+  }
+}
+
+async function runTcpCheck(site) {
+  const log = logger.child({ siteId: site.id, siteName: site.name, monitorType: 'tcp' });
+  const host = (site.tcp_host || '').trim();
+  const port = Number(site.tcp_port);
+  if (!host || !Number.isFinite(port) || port <= 0 || port > 65535) {
+    return { isUp: 0, statusCode: null, responseTimeMs: null, errorMessage: 'tcp: no host/port configured', challenged: false };
+  }
+  const res = await tcpProbe.inspect(host, port, {
+    timeoutMs: Math.max(1000, site.timeout_ms || 5000),
+    expectBanner: site.expected_string || '',
+  });
+  log.trace({ host, port, ok: res.ok, ms: res.responseTimeMs }, 'tcp.check_done');
+  return {
+    isUp: res.ok ? 1 : 0,
+    statusCode: null,
+    responseTimeMs: res.responseTimeMs,
+    errorMessage: res.errorMessage,
+    challenged: false,
+  };
+}
+
+async function runPingCheck(site) {
+  const log = logger.child({ siteId: site.id, siteName: site.name, monitorType: 'ping' });
+  const host = (site.ping_host || site.tcp_host || '').trim();
+  if (!host) {
+    return { isUp: 0, statusCode: null, responseTimeMs: null, errorMessage: 'ping: no host configured', challenged: false };
+  }
+  const res = await pingProbe.inspect(host, {
+    timeoutMs: Math.max(1000, site.timeout_ms || 5000),
+    count: Math.max(1, Math.min(10, site.ping_count || 1)),
+  });
+  log.trace({ host, ok: res.ok, ms: res.responseTimeMs, lossPct: res.lossPct }, 'ping.check_done');
+  return {
+    isUp: res.ok ? 1 : 0,
+    statusCode: null,
+    responseTimeMs: res.responseTimeMs,
+    errorMessage: res.errorMessage,
+    challenged: false,
+  };
+}
+
+async function runDnsCheck(site) {
+  const log = logger.child({ siteId: site.id, siteName: site.name, monitorType: 'dns' });
+  const query = (site.dns_query || '').trim();
+  if (!query) {
+    return { isUp: 0, statusCode: null, responseTimeMs: null, errorMessage: 'dns: no query configured', challenged: false };
+  }
+  const res = await dnsProbe.inspect(query, {
+    timeoutMs: Math.max(1000, site.timeout_ms || 5000),
+    recordType: site.dns_record_type || 'A',
+    resolver: site.dns_resolver || '',
+    expected: site.dns_expected || '',
+  });
+  log.trace({ query, ok: res.ok, records: res.records?.length }, 'dns.check_done');
+  return {
+    isUp: res.ok ? 1 : 0,
+    statusCode: null,
+    responseTimeMs: res.responseTimeMs,
+    errorMessage: res.errorMessage,
+    challenged: false,
+  };
+}
+
 async function runCheck(site) {
   const log = logger.child({ siteId: site.id, siteName: site.name });
+  if (site.monitor_type === 'cert') return runCertCheck(site);
+  if (site.monitor_type === 'tcp') return runTcpCheck(site);
+  if (site.monitor_type === 'ping') return runPingCheck(site);
+  if (site.monitor_type === 'dns') return runDnsCheck(site);
   const checkType = site.check_type || 'status';
   // HEAD probe is only valid when we don't need the response body. Any
   // assertion against the body (string / json) requires GET.
@@ -146,15 +315,22 @@ async function runCheck(site) {
   const baseMethod = useHead ? 'HEAD' : (site.method || 'GET').toUpperCase();
   const timeoutMs = Math.max(1000, site.timeout_ms || 10000);
   const headers = buildHeaders(site);
+  const dispatcher = dispatcherFor(site);
+  // Follow redirects toggle stores 0/1; we map to 0 or 5 hops.
+  const maxRedirections = site.follow_redirects ? 5 : 0;
+  const bodyInfo = pickRequestBody(site);
+  if (bodyInfo.body != null && bodyInfo.contentType && !headers['Content-Type'] && !headers['content-type']) {
+    headers['Content-Type'] = bodyInfo.contentType;
+  }
 
-  log.trace({ url: site.url, method: baseMethod, timeoutMs }, 'check.start');
+  log.trace({ url: site.url, method: baseMethod, timeoutMs, hasBody: !!bodyInfo.body, skipTls: !!site.skip_tls_verify, follow: !!site.follow_redirects }, 'check.start');
 
   let res;
   try {
-    res = await fetchWithTiming({ method: baseMethod, url: site.url, headers, timeoutMs });
+    res = await fetchWithTiming({ method: baseMethod, url: site.url, headers, timeoutMs, body: bodyInfo.body, maxRedirections, dispatcher });
     if (baseMethod === 'HEAD' && res.status === 405) {
       log.trace('check.head_not_allowed_falling_back_to_get');
-      res = await fetchWithTiming({ method: 'GET', url: site.url, headers, timeoutMs });
+      res = await fetchWithTiming({ method: 'GET', url: site.url, headers, timeoutMs, maxRedirections, dispatcher });
     }
   } catch (err) {
     const name = err?.name || err?.code || 'Error';
@@ -197,6 +373,23 @@ async function runCheck(site) {
       pass = res.body.includes(site.expected_string || '');
       if (!pass) why = `body did not contain expected string`;
     }
+  } else if (checkType === 'regex') {
+    if (res.status >= 400) {
+      pass = false;
+      why = `http ${res.status} (regex check)`;
+    } else {
+      const raw = String(site.expected_string || '').trim();
+      try {
+        // Accept either /pattern/flags or a bare pattern (default flags=i).
+        const m = raw.match(/^\/(.+)\/([gimsuy]*)$/);
+        const re = m ? new RegExp(m[1], m[2]) : new RegExp(raw, 'i');
+        pass = re.test(res.body);
+        if (!pass) why = `body did not match regex /${m ? m[1] : raw}/${m ? m[2] : 'i'}`;
+      } catch (e) {
+        pass = false;
+        why = `invalid regex: ${e.message}`;
+      }
+    }
   } else if (checkType === 'json') {
     if (res.status >= 400) {
       pass = false;
@@ -215,10 +408,28 @@ async function runCheck(site) {
     }
   }
 
+  // Response-time threshold — applied after the primary assertion passes so
+  // the reason gets surfaced consistently even if the underlying check was OK.
+  if (pass && site.max_response_time_ms && Number.isFinite(site.max_response_time_ms)) {
+    if (res.responseTimeMs > site.max_response_time_ms) {
+      pass = false;
+      why = `response too slow: ${res.responseTimeMs}ms > ${site.max_response_time_ms}ms`;
+    }
+  }
+
   log.trace(
     { status: res.status, responseTimeMs: res.responseTimeMs, pass, why: pass ? undefined : why },
     'check.evaluated'
   );
+
+  // Best-effort: capture cert info for HTTPS probes so the dashboard can
+  // surface expiry data even for plain status / string / json monitors.
+  // We don't fail the check on TLS issues here — that's what the dedicated
+  // cert monitor type is for.
+  let certInfo = null;
+  if (pass && /^https:\/\//i.test(site.url || '')) {
+    certInfo = await captureCertSideChannel(site);
+  }
 
   return {
     isUp: pass ? 1 : 0,
@@ -226,6 +437,7 @@ async function runCheck(site) {
     responseTimeMs: res.responseTimeMs,
     errorMessage: pass ? null : why,
     challenged: false,
+    cert: certInfo,
   };
 }
 
@@ -246,13 +458,55 @@ async function evaluateHeartbeat(site) {
       challenged: false,
     };
   }
-  const tolerated = (site.interval_seconds || 60) + (site.heartbeat_grace_seconds || 60);
+
+  let tolerated;
+  if (site.heartbeat_schedule_kind === 'cron' && site.heartbeat_cron) {
+    // For cron schedules we accept any ping up to (next expected ping +
+    // grace). The "next expected" is the next occurrence of the cron
+    // counted from the last ping, so a late ping is still tolerated until
+    // the next slot lapses.
+    try {
+      const cronParser = require('cron-parser');
+      const tz = site.heartbeat_timezone || 'UTC';
+      const ref = new Date(Date.now() - ageSec * 1000);
+      const it = cronParser.CronExpressionParser.parse(site.heartbeat_cron, { currentDate: ref, tz });
+      const nextDue = it.next().toDate();
+      const slack = Math.max(0, site.heartbeat_grace_seconds || 60);
+      const cutoff = nextDue.getTime() + slack * 1000;
+      tolerated = Math.max(60, Math.floor((cutoff - (Date.now() - ageSec * 1000)) / 1000));
+      if (Date.now() > cutoff) {
+        return {
+          isUp: 0,
+          statusCode: null,
+          responseTimeMs: null,
+          errorMessage: `no heartbeat for ${ageSec}s (cron "${site.heartbeat_cron}" missed, due by ${nextDue.toISOString()} + ${slack}s)`,
+          challenged: false,
+        };
+      }
+    } catch (err) {
+      tolerated = (site.interval_seconds || 60) + (site.heartbeat_grace_seconds || 60);
+    }
+  } else {
+    tolerated = (site.interval_seconds || 60) + (site.heartbeat_grace_seconds || 60);
+  }
+
   if (ageSec > tolerated) {
     return {
       isUp: 0,
       statusCode: null,
       responseTimeMs: null,
       errorMessage: `no heartbeat for ${ageSec}s (tolerated ${tolerated}s)`,
+      challenged: false,
+    };
+  }
+  // If the last terminal ping was an explicit failure, keep the monitor down
+  // until a new success arrives — regardless of recency.
+  if (site.last_heartbeat_kind === 'failure') {
+    return {
+      isUp: 0,
+      statusCode: null,
+      responseTimeMs: null,
+      errorMessage: `last heartbeat reported failure${site.last_heartbeat_exit_code != null ? ` (exit ${site.last_heartbeat_exit_code})` : ''}`,
       challenged: false,
     };
   }
@@ -265,4 +519,13 @@ async function evaluateHeartbeat(site) {
   };
 }
 
-module.exports = { runCheck, evaluateHeartbeat, sharedAgent };
+module.exports = {
+  runCheck,
+  runCertCheck,
+  runTcpCheck,
+  runPingCheck,
+  runDnsCheck,
+  evaluateHeartbeat,
+  sharedAgent,
+  captureCertSideChannel,
+};

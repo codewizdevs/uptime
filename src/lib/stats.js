@@ -106,12 +106,74 @@ async function lastCheck(siteId) {
   return rows[0] || null;
 }
 
+// Per-day uptime bucket for the public status page.
+// Returns an array of { date: 'YYYY-MM-DD', total, up, down, uptime_pct }
+// ordered oldest first. Days with no probes get uptime_pct = null.
+async function dailyUptime(siteId, days = 90) {
+  const dayExprByDialect = db.dialect === 'sqlite'
+    ? `substr(checked_at, 1, 10)`
+    : `DATE_FORMAT(checked_at, '%Y-%m-%d')`;
+  const hoursWindow = days * 24;
+  const rows = await db.query(
+    `SELECT ${dayExprByDialect} AS day,
+            SUM(CASE WHEN is_up = 1 THEN 1 ELSE 0 END) AS up_count,
+            SUM(CASE WHEN is_up = 0 THEN 1 ELSE 0 END) AS down_count,
+            SUM(CASE WHEN is_up IS NULL THEN 1 ELSE 0 END) AS inconclusive_count
+     FROM checks
+     WHERE site_id = ? AND checked_at > ${db.intervalAgoSql()}
+     GROUP BY day
+     ORDER BY day ASC`,
+    [siteId, hoursWindow]
+  );
+  const byDay = new Map();
+  for (const r of rows) {
+    const up = Number(r.up_count || 0);
+    const down = Number(r.down_count || 0);
+    const total = up + down;
+    byDay.set(r.day, {
+      total,
+      up,
+      down,
+      inconclusive: Number(r.inconclusive_count || 0),
+      uptime_pct: total ? (up / total) * 100 : null,
+    });
+  }
+  const out = [];
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setUTCDate(d.getUTCDate() - i);
+    const iso = d.toISOString().slice(0, 10);
+    out.push({ date: iso, ...(byDay.get(iso) || { total: 0, up: 0, down: 0, inconclusive: 0, uptime_pct: null }) });
+  }
+  return out;
+}
+
+// Most recent N incidents across all sites (newest first), for the public
+// status page feed/RSS.
+async function recentIncidentsGlobal(limit = 25) {
+  return db.query(
+    `SELECT i.id, i.site_id, i.started_at, i.ended_at, i.duration_seconds, i.last_error,
+            s.name AS site_name, s.display_name AS site_display_name, s.url AS site_url,
+            s.status_page_group, s.status_page_excluded
+       FROM incidents i
+       JOIN sites s ON s.id = i.site_id
+      WHERE s.status_page_excluded = 0
+      ORDER BY i.started_at DESC
+      LIMIT ?`,
+    [limit]
+  );
+}
+
 module.exports = {
   uptimePct,
   responseTimeStats,
   recentChecks,
   recentIncidents,
+  recentIncidentsGlobal,
   totalDowntimeSeconds,
   timeseries,
   lastCheck,
+  dailyUptime,
 };

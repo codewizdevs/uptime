@@ -28,15 +28,24 @@
     syncCheckType();
   }
 
+  // On submit, mirror the value of every [data-mirror="targetName"] input
+  // inside the *currently visible* section into the hidden canonical
+  // form-field of that name. This lets each monitor_type have its own UI
+  // copy of shared fields (interval_seconds, failure_threshold, …).
+  //
+  // We also respect [data-check] wrappers so e.g. the regex-flavour input
+  // for the body assertion only writes through when its check_type tab is
+  // actually visible.
   form.addEventListener('submit', function () {
     if (!monitorType) return;
-    if (monitorType.value === 'heartbeat') {
-      const hb = form.querySelector('input[name="interval_seconds_hb"]');
-      const fr = form.querySelector('input[name="failure_threshold_hb"]');
-      const real = form.querySelector('input[name="interval_seconds"]');
-      const realFr = form.querySelector('input[name="failure_threshold"]');
-      if (hb && real) real.value = hb.value;
-      if (fr && realFr) realFr.value = fr.value;
-    }
+    form.querySelectorAll('[data-mirror]').forEach(function (input) {
+      var section = input.closest('[data-section]');
+      if (section && section.hidden) return;
+      var check = input.closest('[data-check]');
+      if (check && check.hidden) return;
+      var name = input.getAttribute('data-mirror');
+      var target = form.querySelector('[name="' + name + '"]:not([data-mirror])');
+      if (target) target.value = input.value;
+    });
   });
 })();

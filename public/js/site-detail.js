@@ -19,6 +19,7 @@
   async function load(hours) {
     const res = await fetch('/api/sites/' + window.__siteId + '/timeseries?hours=' + hours, {
       credentials: 'same-origin',
+      headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
     });
     if (!res.ok) return;
     const data = await res.json();

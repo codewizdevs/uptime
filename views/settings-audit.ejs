@@ -1,0 +1,88 @@
+<div class="page-header d-print-none mb-3">
+  <div class="row g-2 align-items-center">
+    <div class="col">
+      <h2 class="page-title">Audit log</h2>
+      <div class="text-secondary mt-1 small">
+        State-changing actions are recorded here. Most recent 200 entries shown.
+      </div>
+    </div>
+  </div>
+</div>
+
+<form method="get" action="/settings/audit" class="card mb-3">
+  <div class="card-body py-2">
+    <div class="row g-2 align-items-center">
+      <div class="col-auto">
+        <label class="form-label mb-0 small text-secondary">Filter by action</label>
+      </div>
+      <div class="col-auto">
+        <select name="action" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">— all actions —</option>
+          <% actions.forEach(function(a) { %>
+            <option value="<%= a.action %>" <%= filterAction === a.action ? 'selected' : '' %>>
+              <%= a.action %> (<%= a.c %>)
+            </option>
+          <% }); %>
+        </select>
+      </div>
+      <% if (filterAction) { %>
+        <div class="col-auto">
+          <a href="/settings/audit" class="btn btn-sm btn-link text-secondary"><i class="ti ti-x me-1"></i>Clear</a>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</form>
+
+<div class="card">
+  <% if (!entries.length) { %>
+    <div class="card-body">
+      <div class="empty">
+        <p class="empty-title">No entries</p>
+        <p class="empty-subtitle text-secondary">
+          <% if (filterAction) { %>
+            No audit entries for action <code><%= filterAction %></code>.
+          <% } else { %>
+            The audit log will start filling as you perform actions.
+          <% } %>
+        </p>
+      </div>
+    </div>
+  <% } else { %>
+    <div class="table-responsive">
+      <table class="table table-vcenter table-sm card-table">
+        <thead><tr>
+          <th>When</th><th>Actor</th><th>IP</th><th>Action</th><th>Target</th><th>Details</th>
+        </tr></thead>
+        <tbody>
+          <% entries.forEach(function(e) { %>
+            <tr>
+              <td class="text-secondary small text-nowrap"><%= new Date(e.at).toLocaleString() %></td>
+              <td class="small"><%= e.actor || '-' %></td>
+              <td class="text-secondary small font-monospace"><%= e.ip || '-' %></td>
+              <td>
+                <% var color = 'secondary';
+                   if (e.action.startsWith('login.success') || e.action.endsWith('.created')) color = 'success';
+                   else if (e.action.endsWith('.failed') || e.action.endsWith('.deleted') || e.action === 'logout') color = 'red';
+                   else if (e.action.startsWith('2fa.')) color = 'blue';
+                %>
+                <span class="badge bg-<%= color %>-lt font-monospace"><%= e.action %></span>
+              </td>
+              <td class="small">
+                <% if (e.target_type) { %>
+                  <span class="text-secondary"><%= e.target_type %></span>
+                  <% if (e.target_id) { %> #<%= e.target_id %><% } %>
+                <% } else { %>-<% } %>
+              </td>
+              <td class="small">
+                <% if (e.meta_parsed) { %>
+                  <code class="small"><%= JSON.stringify(e.meta_parsed) %></code>
+                <% } else { %>-<% } %>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>

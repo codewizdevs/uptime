@@ -1,0 +1,115 @@
+<div class="page-header d-print-none mb-3">
+  <div class="row g-2 align-items-center">
+    <div class="col">
+      <h2 class="page-title">Tags</h2>
+      <div class="text-secondary mt-1 small">
+        Group monitors with tags. Use them as filters on the dashboard and as bulk-action targets.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-md-4">
+    <form method="post" action="/settings/tags" class="card">
+      <div class="card-header">
+        <h3 class="card-title">New tag</h3>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label required">Name</label>
+          <input type="text" name="name" class="form-control" required maxlength="64" placeholder="api, payments, …">
+        </div>
+        <div>
+          <label class="form-label">Color</label>
+          <div class="tag-color-picker">
+            <% palette.forEach(function(c, idx) { %>
+              <label class="tag-color">
+                <input type="radio" name="color" value="<%= c %>" <%= idx === 0 ? 'checked' : '' %>>
+                <span class="badge bg-<%= c %>-lt"><%= c %></span>
+              </label>
+            <% }); %>
+          </div>
+        </div>
+      </div>
+      <div class="card-footer text-end">
+        <button type="submit" class="btn btn-primary">Create tag</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">All tags (<%= tags.length %>)</h3>
+      </div>
+
+      <% tags.forEach(function(t) { %>
+        <form method="post" action="/settings/tags/<%= t.id %>/edit" id="tag-form-<%= t.id %>" class="d-none"></form>
+        <form method="post" action="/settings/tags/<%= t.id %>/delete" id="tag-del-<%= t.id %>" class="d-none"
+              onsubmit="return confirm('Delete tag &quot;<%= t.name %>&quot;? It will be removed from all monitors.');"></form>
+      <% }); %>
+
+      <% if (!tags.length) { %>
+        <div class="card-body">
+          <div class="empty">
+            <p class="empty-title">No tags yet</p>
+            <p class="empty-subtitle text-secondary">Create your first tag on the left and attach it to monitors from the monitor form.</p>
+          </div>
+        </div>
+      <% } else { %>
+        <div class="table-responsive">
+          <table class="table table-vcenter">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Color</th>
+                <th class="w-1 text-end">Monitors</th>
+                <th class="w-1 text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% tags.forEach(function(t) { %>
+                <tr>
+                  <td>
+                    <input type="text" name="name" class="form-control form-control-sm"
+                           value="<%= t.name %>" maxlength="64" form="tag-form-<%= t.id %>">
+                  </td>
+                  <td>
+                    <select name="color" class="form-select form-select-sm"
+                            form="tag-form-<%= t.id %>" style="max-width: 200px;">
+                      <% palette.forEach(function(c) { %>
+                        <option value="<%= c %>" <%= t.color === c ? 'selected' : '' %>><%= c %></option>
+                      <% }); %>
+                    </select>
+                  </td>
+                  <td class="text-end small">
+                    <span class="badge bg-<%= t.color %>-lt"><i class="ti ti-tag me-1"></i><%= t.site_count %></span>
+                  </td>
+                  <td class="text-end">
+                    <div class="btn-list flex-nowrap justify-content-end">
+                      <button type="submit" class="btn btn-sm btn-link" title="Save" form="tag-form-<%= t.id %>">
+                        <i class="ti ti-check"></i> Save
+                      </button>
+                      <button type="submit" class="btn btn-sm btn-link text-danger" title="Delete" form="tag-del-<%= t.id %>">
+                        <i class="ti ti-trash"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<style>
+.tag-color-picker { display: flex; flex-wrap: wrap; gap: .35rem; }
+.tag-color { cursor: pointer; }
+.tag-color input { display: none; }
+.tag-color .badge { padding: .35rem .55rem; opacity: .55; transition: opacity .15s; }
+.tag-color input:checked + .badge { opacity: 1; box-shadow: 0 0 0 2px var(--tblr-primary, #066fd1); }
+</style>

@@ -113,7 +113,14 @@
       const ids = visibleIds();
       if (!ids.length) return;
       const url = '/api/sites?ids=' + encodeURIComponent(ids.join(','));
-      const res = await fetch(url, { credentials: 'same-origin' });
+      const res = await fetch(url, {
+        credentials: 'same-origin',
+        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      });
+      if (res.status === 401) {
+        clearInterval(window.__dashTickInterval);
+        return;
+      }
       if (!res.ok) return;
       const data = await res.json();
       data.forEach(function (s) {
@@ -143,5 +150,63 @@
   }
 
   tick();
-  setInterval(tick, 5000);
+  window.__dashTickInterval = setInterval(tick, 5000);
+
+  // ─── Bulk-select mode ──────────────────────────────────────────────────
+  const bulkToggle = document.getElementById('bulk-toggle');
+  const bulkBar = document.getElementById('bulk-bar');
+  const bulkCountEl = document.getElementById('bulk-count');
+  const bulkForm = document.getElementById('bulk-form');
+  const bulkActionInput = document.getElementById('bulk-action');
+  const bulkTagInput = document.getElementById('bulk-tag-id');
+  const bulkTagSelect = document.getElementById('bulk-tag-select');
+  const bulkCancel = document.getElementById('bulk-cancel');
+
+  if (!bulkToggle || !bulkBar || !bulkForm) return;
+
+  let selectMode = false;
+  function setSelectMode(on) {
+    selectMode = !!on;
+    document.querySelectorAll('.site-card-select').forEach(function (el) { el.hidden = !on; });
+    document.querySelectorAll('.site-card-delete').forEach(function (el) { el.hidden = !!on; });
+    bulkBar.hidden = !on || selectedIds().length === 0;
+    const label = bulkToggle.querySelector('[data-role="label"]');
+    if (label) label.textContent = on ? 'Cancel select' : 'Select';
+    bulkToggle.classList.toggle('btn-primary', on);
+    bulkToggle.classList.toggle('btn-outline-secondary', !on);
+    if (!on) {
+      document.querySelectorAll('input[name="site_ids"]').forEach(function (c) { c.checked = false; });
+      refreshCount();
+    }
+  }
+  function selectedIds() {
+    return Array.from(document.querySelectorAll('input[name="site_ids"]:checked'));
+  }
+  function refreshCount() {
+    const n = selectedIds().length;
+    if (bulkCountEl) bulkCountEl.textContent = String(n);
+    bulkBar.hidden = !selectMode || n === 0;
+  }
+  bulkToggle.addEventListener('click', function () { setSelectMode(!selectMode); });
+  if (bulkCancel) bulkCancel.addEventListener('click', function () { setSelectMode(false); });
+  document.addEventListener('change', function (e) {
+    if (e.target && e.target.matches('input[name="site_ids"]')) refreshCount();
+  });
+  bulkBar.querySelectorAll('[data-bulk-action]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const action = btn.getAttribute('data-bulk-action');
+      const ids = selectedIds();
+      if (!ids.length) return;
+      if (action === 'tag_add' || action === 'tag_remove') {
+        const tagId = bulkTagSelect && bulkTagSelect.value;
+        if (!tagId) { alert('Pick a tag from the dropdown first.'); return; }
+        bulkTagInput.value = tagId;
+      }
+      if (action === 'delete') {
+        if (!confirm('Delete ' + ids.length + ' monitor(s)? This cannot be undone.')) return;
+      }
+      bulkActionInput.value = action;
+      bulkForm.submit();
+    });
+  });
 })();

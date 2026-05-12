@@ -4,16 +4,22 @@
       <h2 class="page-title">Notification channels</h2>
       <div class="text-secondary mt-1">Where DOWN, RECOVERED, and challenged events are delivered. Attach channels to a monitor on its edit page.</div>
     </div>
-    <div class="col-auto d-flex gap-2">
-      <a href="/channels/new?type=discord" class="btn btn-primary">
-        <i class="ti ti-brand-discord me-1"></i> New Discord
-      </a>
-      <a href="/channels/new?type=webhook" class="btn btn-outline-primary">
-        <i class="ti ti-webhook me-1"></i> New webhook
-      </a>
-      <a href="/channels/new?type=email" class="btn btn-outline-primary">
-        <i class="ti ti-mail me-1"></i> New email
-      </a>
+    <div class="col-auto">
+      <div class="dropdown-wrap">
+        <button class="btn btn-primary" data-dropdown-toggle="#new-channel-menu" aria-haspopup="menu" aria-expanded="false">
+          <i class="ti ti-plus me-1"></i> New channel <i class="ti ti-chevron-down ms-1"></i>
+        </button>
+        <div class="dropdown-menu" id="new-channel-menu" role="menu">
+          <% const order = ['discord','slack','telegram','ntfy','gotify','pushover','mattermost','teams','email','webhook']; %>
+          <% order.forEach(function(t) {
+               var meta = (typeof CHANNEL_META !== 'undefined' && CHANNEL_META[t]) || null;
+               if (!meta) return; %>
+            <a class="dropdown-item" href="/channels/new?type=<%= t %>">
+              <i class="ti <%= meta.icon %> me-2 text-<%= meta.color %>"></i> New <%= meta.label %>
+            </a>
+          <% }) %>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -46,21 +52,26 @@
                 <a href="/channels/<%= c.id %>/edit" class="text-body fw-semibold text-decoration-none"><%= c.name %></a>
               </td>
               <td>
-                <% if (c.type === 'discord') { %>
-                  <span class="badge bg-indigo-lt"><i class="ti ti-brand-discord me-1"></i> Discord</span>
-                <% } else if (c.type === 'webhook') { %>
-                  <span class="badge bg-cyan-lt"><i class="ti ti-webhook me-1"></i> Webhook</span>
-                <% } else { %>
-                  <span class="badge bg-blue-lt"><i class="ti ti-mail me-1"></i> Email</span>
-                <% } %>
+                <% var meta = (CHANNEL_META && CHANNEL_META[c.type]) || { label: c.type, icon: 'ti-bell', color: 'secondary' }; %>
+                <span class="badge bg-<%= meta.color %>-lt"><i class="ti <%= meta.icon %> me-1"></i> <%= meta.label %></span>
               </td>
               <td class="small text-secondary text-truncate" style="max-width: 360px;">
                 <% if (c.type === 'discord') { %>
                   <%= (c.config.webhook_url || '').replace(/(https:\/\/discord\.com\/api\/webhooks\/[0-9]+\/).+/, '$1...') %>
                 <% } else if (c.type === 'webhook') { %>
                   <%= (c.config.method || 'POST') %> <%= c.config.url || '' %>
-                <% } else { %>
+                <% } else if (c.type === 'email') { %>
                   <%= (c.config.to || []).join(', ') %>
+                <% } else if (c.type === 'slack' || c.type === 'mattermost' || c.type === 'teams') { %>
+                  <%= (c.config.webhook_url || '').replace(/^(https?:\/\/[^/]+\/[^/]+\/)[^/]+(.*)$/, '$1…$2') %>
+                <% } else if (c.type === 'telegram') { %>
+                  chat <%= c.config.chat_id || '' %>
+                <% } else if (c.type === 'ntfy') { %>
+                  <%= c.config.topic_url || '' %>
+                <% } else if (c.type === 'gotify') { %>
+                  <%= c.config.server_url || '' %>
+                <% } else if (c.type === 'pushover') { %>
+                  user <%= (c.config.user_key || '').slice(0, 4) %>…
                 <% } %>
               </td>
               <td>
