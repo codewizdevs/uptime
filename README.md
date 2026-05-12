@@ -267,18 +267,11 @@ All configuration lives in `.env`. The most important keys:
 | `SQLITE_PATH` | `data/uptime.sqlite` | SQLite file path (relative to project root or absolute). |
 | `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | — | MySQL connection (only when `DB_DRIVER=mysql`). |
 
-### Whitelabeling (optional)
+### Whitelabeling
 
-| Variable | Effect |
-|---|---|
-| `APP_NAME` | App name in the navbar, page titles, login screen. |
-| `APP_TAGLINE` | Small text under the app name in the footer. |
-| `APP_LOGO_PATH` | Path to a PNG / SVG / WebP / JPG / GIF / ICO logo (relative or absolute). |
-| `APP_FAVICON_PATH` | Path to a favicon. |
-| `FOOTER_CREDITS_HIDE` | `true` hides the footer credits entirely. |
-| `FOOTER_CREDITS_LEAD` / `FOOTER_CREDITS_TEXT` / `FOOTER_CREDITS_URL` | Override the credit line. |
+Whitelabeling is managed live from **Settings → Branding & whitelabel** in the app — app name, tagline, logo, favicon, footer credits, and credit-line visibility, all without a restart. Logo and favicon uploads are stored in the database; the URL versions bust browser cache automatically on update.
 
-Whitelabeling can also be edited live from **Settings → Branding** without an app restart.
+Older deployments that set `APP_NAME`, `APP_TAGLINE`, `APP_LOGO_PATH`, `APP_FAVICON_PATH`, or `FOOTER_CREDITS_*` in `.env` still work as a fallback when the database value is empty, but the panel is the primary path going forward.
 
 A complete list with comments is in [`.env.example`](./.env.example).
 
