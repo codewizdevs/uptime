@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="referrer" content="no-referrer">
+  <title>Uptime — self-hosted open-source uptime monitor in Node.js</title>
+
+  <meta name="description" content="Self-hosted, MIT-licensed uptime monitor in Node.js with HTTP, TCP, ping, DNS, TLS cert, and heartbeat probes. 10 notification channels, public status page, multi-user ACLs, REST API, and Prometheus exporter. A lightweight alternative to Uptime Kuma, Healthchecks.io, Gatus, Statping, and Better Stack.">
+  <meta name="keywords" content="uptime monitor, self-hosted uptime monitor, open source uptime monitor, Uptime Kuma alternative, Healthchecks.io alternative, Gatus alternative, Statping alternative, Better Stack alternative, Node.js uptime monitor, SQLite uptime monitor, MySQL uptime monitor, website monitor, HTTP monitor, TLS certificate monitor, SSL expiry monitor, heartbeat monitor, cron monitor, Cloudflare-aware monitoring, Discord uptime notifications, Slack uptime alerts, Prometheus uptime exporter, public status page">
+  <meta name="author" content="CodeWiz">
+  <meta name="theme-color" content="#0f1722">
+
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Uptime — self-hosted open-source uptime monitor in Node.js">
+  <meta property="og:description" content="A lightweight, MIT-licensed, single-process uptime monitor. HTTP / TCP / ping / DNS / TLS / heartbeat probes, 10 notification channels, status page, multi-user ACLs, REST API, Prometheus exporter. No Docker required.">
+  <meta property="og:image" content="screenshots/dashboard.png">
+  <meta property="og:url" content="https://codewizdevs.github.io/uptime/">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Uptime — self-hosted open-source uptime monitor">
+  <meta name="twitter:description" content="HTTP / TCP / ping / DNS / TLS / heartbeat probes. 10 notification channels. Public status page. Multi-user ACLs. Prometheus exporter. MIT-licensed. No Docker required.">
+  <meta name="twitter:image" content="screenshots/dashboard.png">
+
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
+  <link rel="canonical" href="https://codewizdevs.github.io/uptime/">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-nav">
+  <div class="container">
+    <a href="#" class="brand">
+      <img src="logo.svg" width="36" height="36" alt="Uptime logo">
+      <span>Uptime</span>
+    </a>
+    <nav class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#screenshots">Screenshots</a>
+      <a href="#compare">Compare</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/codewizdevs/uptime" class="nav-cta" target="_blank" rel="noopener">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.79-.25.79-.55v-2.02c-3.2.69-3.88-1.37-3.88-1.37-.52-1.33-1.27-1.68-1.27-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.68 1.24 3.34.95.1-.74.4-1.24.72-1.53-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.18-3.1-.12-.29-.51-1.47.11-3.06 0 0 .97-.31 3.18 1.18a11.07 11.07 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.24 2.77.12 3.06.74.81 1.18 1.84 1.18 3.1 0 4.43-2.69 5.4-5.26 5.69.41.36.78 1.06.78 2.13v3.16c0 .31.21.66.8.55C20.21 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5z"/></svg>
+        Star on GitHub
+      </a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="container hero-grid">
+    <div class="hero-copy">
+      <span class="badge-pill">MIT-licensed · No Docker required</span>
+      <h1>Self-hosted uptime monitor<br>built for small teams.</h1>
+      <p class="lead">
+        One Express + EJS app, SQLite (or MySQL), zero build step. Monitor HTTP, TCP, ICMP, DNS, TLS certificates, and passive heartbeats. Alert through 10 channels. Share monitors with per-monitor ACLs. <strong>A lightweight alternative to Uptime Kuma, Healthchecks.io, Gatus, Statping, and Better Stack.</strong>
+      </p>
+      <div class="hero-ctas">
+        <a class="btn btn-primary" href="https://github.com/codewizdevs/uptime" target="_blank" rel="noopener">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.79-.25.79-.55v-2.02c-3.2.69-3.88-1.37-3.88-1.37-.52-1.33-1.27-1.68-1.27-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.68 1.24 3.34.95.1-.74.4-1.24.72-1.53-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.18-3.1-.12-.29-.51-1.47.11-3.06 0 0 .97-.31 3.18 1.18a11.07 11.07 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.24 2.77.12 3.06.74.81 1.18 1.84 1.18 3.1 0 4.43-2.69 5.4-5.26 5.69.41.36.78 1.06.78 2.13v3.16c0 .31.21.66.8.55C20.21 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5z"/></svg>
+          View on GitHub
+        </a>
+        <a class="btn btn-ghost" href="#install">Quick start →</a>
+        <a class="btn btn-ghost" href="#screenshots">See screenshots</a>
+      </div>
+      <div class="hero-meta">
+        <span><span class="dot dot-green"></span> MIT license</span>
+        <span><span class="dot dot-blue"></span> Node.js 20+</span>
+        <span><span class="dot dot-violet"></span> SQLite · MySQL</span>
+        <span><span class="dot dot-amber"></span> ~150 MB RAM</span>
+      </div>
+    </div>
+    <div class="hero-shot">
+      <img src="screenshots/dashboard.png" alt="Self-hosted uptime monitor dashboard with monitor cards and dark mode" loading="eager">
+    </div>
+  </div>
+</section>
+
+<section class="strip">
+  <div class="container strip-grid">
+    <div>
+      <div class="kpi">10</div>
+      <div class="kpi-label">notification channels</div>
+    </div>
+    <div>
+      <div class="kpi">6</div>
+      <div class="kpi-label">monitor types</div>
+    </div>
+    <div>
+      <div class="kpi">3</div>
+      <div class="kpi-label">roles + per-monitor ACL</div>
+    </div>
+    <div>
+      <div class="kpi">1</div>
+      <div class="kpi-label">process · no Docker required</div>
+    </div>
+  </div>
+</section>
+
+<section id="features" class="section">
+  <div class="container">
+    <h2 class="section-title">Everything a self-hosted team monitor needs</h2>
+    <p class="section-lead">Probe anything you can reach, alert anywhere you operate, share with anyone on the team.</p>
+
+    <div class="feature-grid">
+      <article class="feature">
+        <div class="feature-icon icon-green">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </div>
+        <h3>Cloudflare-aware probing</h3>
+        <p>Detects Cloudflare challenges, records them as <em>inconclusive</em> instead of DOWN, adapts back-off, rotates realistic browser user-agents. <strong>The feature no other open-source uptime monitor ships out of the box.</strong></p>
+      </article>
+
+      <article class="feature">
+        <div class="feature-icon icon-blue">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 10v6m11-11h-6M7 12H1m17.07-7.07l-4.24 4.24M9.17 14.83l-4.24 4.24m0-14.14l4.24 4.24m5.66 5.66l4.24 4.24"/></svg>
+        </div>
+        <h3>6 monitor types</h3>
+        <p>HTTP / HTTPS with regex, JSON-path, body-string, and status-code assertions. TCP, ICMP ping, DNS records, TLS cert expiry, and passive heartbeats (Healthchecks.io-style with start / success / fail pings and cron schedules).</p>
+      </article>
+
+      <article class="feature">
+        <div class="feature-icon icon-violet">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        </div>
+        <h3>10 notification channels</h3>
+        <p>Discord, Slack, Telegram, Ntfy.sh, Gotify, Pushover, Mattermost, Microsoft Teams, SMTP email, generic webhook. Per-event message templates with placeholders and one-click reset-to-default.</p>
+      </article>
+
+      <article class="feature">
+        <div class="feature-icon icon-amber">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <h3>Multi-user with per-monitor ACLs</h3>
+        <p>Flat <code>admin</code> / <code>editor</code> / <code>viewer</code> roles layered with per-monitor <code>view</code> / <code>manage</code> grants. Argon2id password hashing, per-user TOTP 2FA, personal API tokens — all backed by an env super-admin break-glass account.</p>
+      </article>
+
+      <article class="feature">
+        <div class="feature-icon icon-red">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        </div>
+        <h3>Public status page + RSS</h3>
+        <p><code>/status</code> route (token-gated optional) with 90-day daily uptime bars, ordered monitor groups, per-monitor display-name overrides, last-24h MTTR, and an Atom feed at <code>/status.rss</code>.</p>
+      </article>
+
+      <article class="feature">
+        <div class="feature-icon icon-cyan">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-3a2 2 0 0 1-2-2V2"/><path d="M9 18a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-1m18-1v-7a2 2 0 0 0-2-2h-8.5a2 2 0 0 0-1.41.58L5.59 9.59A2 2 0 0 0 5 11v6a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2z"/></svg>
+        </div>
+        <h3>REST API + Prometheus</h3>
+        <p>Token-authenticated <code>/api/v1/*</code> with <code>read</code> / <code>write</code> scopes — every endpoint ACL-filtered through the token owner. Built-in <code>/metrics</code> Prometheus exporter for Grafana, also ACL-aware.</p>
+      </article>
+
+      <article class="feature">
+        <div class="feature-icon icon-pink">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+        </div>
+        <h3>Tags, bulk actions, live polling</h3>
+        <p>Coloured tag chips, multi-select bulk toolbar (pause / resume / delete / add-tag / remove-tag), server-side pagination, full-text search, and 5-second live polling of just the visible cards.</p>
+      </article>
+
+      <article class="feature">
+        <div class="feature-icon icon-teal">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <h3>Hardened auth</h3>
+        <p>Per-user TOTP 2FA (RFC 6238) with 10 single-use recovery codes, in-memory rate-limit & lockout (5/15 min IP + 10/30 min username), full audit log per actor, and argon2id password hashing.</p>
+      </article>
+
+      <article class="feature">
+        <div class="feature-icon icon-orange">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </div>
+        <h3>JSON backup / restore</h3>
+        <p>Export all or a selected subset of monitors, channels, and SMTP settings to a portable JSON file. Restore on another instance with a configurable conflict strategy (skip / replace / rename).</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section id="unique" class="section section-tint">
+  <div class="container">
+    <h2 class="section-title">Things no other open-source uptime monitor ships</h2>
+    <p class="section-lead">Honest list. Uptime is a mature space — but these are real, falsifiable differences that solve real on-call pain.</p>
+
+    <div class="unique-grid">
+      <div class="unique-card">
+        <h3><span class="num">01</span> Cloudflare-aware probing</h3>
+        <p>Detects Cloudflare challenges via status, <code>cf-mitigated</code> header, and body markers. Marks them as <em>inconclusive</em> so a JS challenge never tanks your uptime % or fires a false-positive alert. Adaptive exponential back-off, rotated browser UAs, optional per-monitor HEAD-first "Cloudflare mode".</p>
+      </div>
+      <div class="unique-card">
+        <h3><span class="num">02</span> <code>during_maintenance</code> flag on incidents</h3>
+        <p>Competitors silently suppress incidents during maintenance windows. We open the incident <em>and</em> flag it — so you can count "real" outages separately from ones you caused.</p>
+      </div>
+      <div class="unique-card">
+        <h3><span class="num">03</span> Mute, distinct from Pause</h3>
+        <p>Keep the probes running and the history flowing, but suppress channel dispatches. Pause stops everything. Most monitors only have pause.</p>
+      </div>
+      <div class="unique-card">
+        <h3><span class="num">04</span> Per-token ACL filtering on API + metrics</h3>
+        <p>API tokens inherit the creator's monitor visibility. The Prometheus <code>/metrics</code> exporter respects that too. Most exporters are flat admin-or-nothing.</p>
+      </div>
+      <div class="unique-card">
+        <h3><span class="num">05</span> Env super-admin + DB users side-by-side</h3>
+        <p><code>.env</code> credentials stay as a permanent break-glass account, always admin, with its own TOTP secret. DB users have their own. You can never lock yourself out.</p>
+      </div>
+      <div class="unique-card">
+        <h3><span class="num">06</span> Single-process, Docker-optional, SQLite default</h3>
+        <p>Clone, <code>npm install</code>, <code>npm start</code>. That's the prerequisite list. Docker is available if you want it; nothing about the project assumes it.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="screenshots" class="section">
+  <div class="container">
+    <h2 class="section-title">Screenshots</h2>
+    <p class="section-lead">Clean, dark-by-default UI. Vanilla JS — no Bootstrap JS bundle, no SPA.</p>
+
+    <div class="shot-grid">
+      <figure class="shot shot-wide">
+        <img src="screenshots/dashboard.png" alt="Self-hosted uptime monitor dashboard with monitor cards and dark mode" loading="lazy">
+        <figcaption>Live dashboard — compact monitor cards, 5s polling, full-text search.</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="screenshots/monitor-detail.png" alt="Monitor detail page with response-time chart, uptime stats, and incidents" loading="lazy">
+        <figcaption>Monitor detail — 24h / 7d / 30d charts, P95, incident timeline.</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="screenshots/monitor-detail-sharing.png" alt="Per-monitor sharing grants with view / manage permissions" loading="lazy">
+        <figcaption>Per-monitor sharing — owners hand out <code>view</code> or <code>manage</code> grants.</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="screenshots/channels.png" alt="Notification channels: Discord, Slack, Telegram, Ntfy, Gotify, Pushover, Mattermost, Teams, email, webhook" loading="lazy">
+        <figcaption>10 notification channels, attach any number per monitor.</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="screenshots/channel-templates.png" alt="Notification message templates with placeholder palette" loading="lazy">
+        <figcaption>Customisable per-event templates with one-click placeholder insertion.</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="screenshots/monitor-form.png" alt="New monitor form with assertions, headers, tags" loading="lazy">
+        <figcaption>Monitor form — status / regex / JSON-path / body assertions.</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="screenshots/monitor-form-advanced.png" alt="Advanced HTTP monitor options: auth, body, redirects, TLS verify" loading="lazy">
+        <figcaption>Advanced probe options — auth, body, redirects, skip-TLS-verify.</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="screenshots/status-page.png" alt="Public status page with 90-day uptime bars" loading="lazy">
+        <figcaption>Public status page — 90-day bars, grouped monitors, RSS feed.</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="screenshots/settings-users.png" alt="Admin users and roles management" loading="lazy">
+        <figcaption>Users &amp; roles admin — argon2id passwords, per-user 2FA.</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="screenshots/settings-user-grants.png" alt="Per-user, per-monitor access control grants: none, view, manage" loading="lazy">
+        <figcaption>Per-monitor ACL grants — bulk none / view / manage.</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="screenshots/settings-account.png" alt="Personal account page: profile, password, 2FA, recovery codes, API tokens" loading="lazy">
+        <figcaption>My account — profile, password, 2FA, recovery codes, API tokens.</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="screenshots/audit-log.png" alt="Audit log with action filter dropdown and JSON metadata" loading="lazy">
+        <figcaption>Audit log — every action, actor, IP, target, JSON meta.</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="screenshots/backup-restore.png" alt="Backup and restore configuration JSON import / export" loading="lazy">
+        <figcaption>Backup &amp; restore — selective JSON export with conflict strategy.</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="screenshots/dashboard-filters.png" alt="Uptime monitor dashboard filters" loading="lazy">
+        <figcaption>Filters — by state, type, Cloudflare mode, and tag.</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="screenshots/dashboard-bulk-actions.png" alt="Bulk pause, resume, delete, tag actions" loading="lazy">
+        <figcaption>Bulk actions toolbar — pause / resume / delete / tag, sticky.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section id="compare" class="section section-tint">
+  <div class="container">
+    <h2 class="section-title">Compared to other uptime monitors</h2>
+    <p class="section-lead">Picked carefully. We don't try to out-feature Uptime Kuma; we make a different trade-off.</p>
+
+    <div class="compare-wrap">
+      <table class="compare">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="us">Uptime <span class="ours-tag">this</span></th>
+            <th>Uptime Kuma</th>
+            <th>Healthchecks.io</th>
+            <th>Gatus</th>
+            <th>Statping-ng</th>
+            <th>Better Stack</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><th>License</th>             <td class="us">MIT</td>      <td>MIT</td>       <td>BSD-3</td>      <td>Apache-2</td><td>Apache-2</td><td>Proprietary</td></tr>
+          <tr><th>Self-hosted</th>         <td class="us">Yes</td>      <td>Yes</td>       <td>Yes</td>        <td>Yes</td>     <td>Yes</td>     <td>No (SaaS)</td></tr>
+          <tr><th>Runs without Docker</th> <td class="us yes">Yes (1 process)</td> <td>Yes</td> <td>Yes</td>   <td>Yes</td>     <td>Yes</td>     <td>—</td></tr>
+          <tr><th>HTTP / TCP / Ping / DNS / Cert</th>          <td class="us yes">All five</td> <td>Most</td>   <td>HTTP only (passive)</td> <td>Most</td><td>HTTP / TCP</td><td>All five</td></tr>
+          <tr><th>Heartbeats with cron + body capture</th>     <td class="us yes">Yes</td>    <td>Basic</td>     <td>Best in class</td>      <td>No</td>  <td>No</td>      <td>Yes</td></tr>
+          <tr><th>Cloudflare-aware probing</th>                <td class="us yes">Yes</td>    <td>No</td>        <td>No</td>                 <td>No</td>  <td>No</td>      <td>—</td></tr>
+          <tr><th>Notification channels</th>                   <td class="us">10</td>        <td>90+</td>       <td>30+</td>                <td>Via shoutrrr</td><td>13</td><td>20+</td></tr>
+          <tr><th>Public status page + RSS</th>                <td class="us yes">Yes</td>    <td>Yes</td>       <td>No</td>                 <td>Yes</td> <td>Yes</td>     <td>Yes</td></tr>
+          <tr><th>Multi-user with per-monitor ACLs</th>        <td class="us yes">Yes</td>    <td>Coming</td>    <td>Teams only</td>         <td>No</td>  <td>Limited</td> <td>Yes</td></tr>
+          <tr><th>REST API + Prometheus exporter</th>          <td class="us yes">Both (ACL-filtered)</td><td>Limited</td><td>API only</td><td>Read-only</td><td>API only</td><td>API only</td></tr>
+          <tr><th>Audit log per actor</th>                     <td class="us yes">Yes</td>    <td>No</td>        <td>No</td>                 <td>No</td>  <td>No</td>      <td>Yes</td></tr>
+          <tr><th>Login rate-limit + lockout</th>              <td class="us yes">Yes</td>    <td>No</td>        <td>Yes</td>                <td>No</td>  <td>No</td>      <td>Yes</td></tr>
+          <tr><th>Dark mode by default</th>                    <td class="us yes">Yes</td>    <td>Yes</td>       <td>Yes</td>                <td>No</td>  <td>No</td>      <td>Yes</td></tr>
+          <tr><th>Footprint</th>                               <td class="us">~150 MB · 1 process</td><td>~100 MB</td><td>~200 MB</td><td>~30 MB</td><td>~80 MB</td><td>—</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="footnote">Compared as of May 2026 against publicly documented features. PRs welcome if anything's out of date.</p>
+  </div>
+</section>
+
+<section id="install" class="section">
+  <div class="container">
+    <h2 class="section-title">Quick start</h2>
+    <p class="section-lead">Three minutes from <code>git clone</code> to a live dashboard.</p>
+
+    <div class="install-grid">
+      <div class="install-step">
+        <h3><span class="step-num">1</span> Clone &amp; install</h3>
+<pre><code>git clone https://github.com/codewizdevs/uptime.git
+cd uptime
+npm install
+cp .env.example .env</code></pre>
+      </div>
+      <div class="install-step">
+        <h3><span class="step-num">2</span> Edit <code>.env</code></h3>
+<pre><code>SESSION_SECRET=$(openssl rand -hex 48)
+ADMIN_USER=admin
+ADMIN_PASS=&lt;something strong&gt;
+DB_DRIVER=sqlite    # or mysql</code></pre>
+      </div>
+      <div class="install-step">
+        <h3><span class="step-num">3</span> Start it</h3>
+<pre><code>npm start
+# or for production
+pm2 start src/server.js --name uptime
+pm2 save</code></pre>
+      </div>
+    </div>
+
+    <p class="install-foot">
+      Open <code>http://localhost:3000</code> and sign in. The schema auto-applies on first boot — no migration step. Need more? See the
+      <a href="https://github.com/codewizdevs/uptime#production-deployment-pm2--nginx" target="_blank" rel="noopener">PM2 + nginx</a>
+      and
+      <a href="https://github.com/codewizdevs/uptime#run-with-docker-optional" target="_blank" rel="noopener">Docker</a>
+      guides on GitHub.
+    </p>
+  </div>
+</section>
+
+<section id="stack" class="section section-tint">
+  <div class="container">
+    <h2 class="section-title">Stack</h2>
+    <p class="section-lead">Boring on purpose. Easy to read, easy to fork, easy to deploy.</p>
+
+    <div class="stack-grid">
+      <div><strong>Runtime</strong><span>Node.js 20+</span></div>
+      <div><strong>Server</strong><span>Express 4 + EJS</span></div>
+      <div><strong>HTTP client</strong><span><code>undici</code> (HTTP/2, brotli)</span></div>
+      <div><strong>Database</strong><span><code>better-sqlite3</code> or <code>mysql2</code></span></div>
+      <div><strong>Sessions</strong><span><code>express-session</code></span></div>
+      <div><strong>Passwords</strong><span><code>argon2</code> (argon2id)</span></div>
+      <div><strong>Mail</strong><span><code>nodemailer</code></span></div>
+      <div><strong>Frontend</strong><span>Tabler CSS + vanilla JS</span></div>
+      <div><strong>Charts</strong><span>Chart.js</span></div>
+      <div><strong>Logs</strong><span><code>pino</code> + rolling file</span></div>
+      <div><strong>Process mgr</strong><span>PM2 (optional)</span></div>
+      <div><strong>Container</strong><span>Docker / compose (optional)</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="built-by" class="section section-built">
+  <div class="container built-grid">
+    <div>
+      <h2 class="section-title section-title-left">Built &amp; maintained by CodeWiz</h2>
+      <p>
+        CodeWiz is a full-stack development agency specializing in custom web development, AI/ML integration, DevOps, and modern web technologies. We build, ship, and operate self-hosted infrastructure for small teams and bootstrapped products — and we open-source the parts we'd want to use ourselves.
+      </p>
+      <p>
+        Need this deployed for you, a custom integration, or a private fork with company-specific channels and SSO? <a href="https://codewizdev.com/" target="_blank" rel="noopener">Get in touch.</a>
+      </p>
+    </div>
+    <div class="built-card">
+      <h3>Contact</h3>
+      <ul class="contact-list">
+        <li>
+          <span class="contact-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          </span>
+          <a href="mailto:hello@codewizdev.com">hello@codewizdev.com</a>
+        </li>
+        <li>
+          <span class="contact-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          </span>
+          <a href="https://codewizdev.com/" target="_blank" rel="noopener">codewizdev.com</a>
+        </li>
+        <li>
+          <span class="contact-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.79-.25.79-.55v-2.02c-3.2.69-3.88-1.37-3.88-1.37-.52-1.33-1.27-1.68-1.27-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.68 1.24 3.34.95.1-.74.4-1.24.72-1.53-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.18-3.1-.12-.29-.51-1.47.11-3.06 0 0 .97-.31 3.18 1.18a11.07 11.07 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.24 2.77.12 3.06.74.81 1.18 1.84 1.18 3.1 0 4.43-2.69 5.4-5.26 5.69.41.36.78 1.06.78 2.13v3.16c0 .31.21.66.8.55C20.21 21.39 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5z"/></svg>
+          </span>
+          <a href="https://github.com/codewizdevs/uptime" target="_blank" rel="noopener">github.com/codewizdevs/uptime</a>
+        </li>
+      </ul>
+      <div class="services-tags">
+        <span>Web Dev</span>
+        <span>AI / ML</span>
+        <span>DevOps</span>
+        <span>Node.js</span>
+        <span>Laravel</span>
+        <span>React</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="site-foot">
+  <div class="container foot-grid">
+    <div>
+      <a href="#" class="brand brand-foot">
+        <img src="logo.svg" width="28" height="28" alt="Uptime logo">
+        <span>Uptime</span>
+      </a>
+      <p class="muted">MIT-licensed, self-hosted, open-source uptime monitor. Built with Node.js, Express, and SQLite (or MySQL).</p>
+    </div>
+    <div>
+      <h4>Project</h4>
+      <ul>
+        <li><a href="https://github.com/codewizdevs/uptime" target="_blank" rel="noopener">GitHub repository</a></li>
+        <li><a href="https://github.com/codewizdevs/uptime/blob/main/README.md" target="_blank" rel="noopener">Documentation (README)</a></li>
+        <li><a href="https://github.com/codewizdevs/uptime/blob/main/PLAN.md" target="_blank" rel="noopener">Roadmap (PLAN)</a></li>
+        <li><a href="https://github.com/codewizdevs/uptime/issues" target="_blank" rel="noopener">Issues</a></li>
+        <li><a href="https://github.com/codewizdevs/uptime/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>CodeWiz</h4>
+      <ul>
+        <li><a href="https://codewizdev.com/" target="_blank" rel="noopener">Agency homepage</a></li>
+        <li><a href="mailto:hello@codewizdev.com">hello@codewizdev.com</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="container foot-bottom">
+    <span class="muted">© 2026 CodeWiz · Open source, MIT-licensed</span>
+    <span class="muted">Built with Node.js, Express, and a lot of opinions about config-as-UI</span>
+  </div>
+</footer>
+
+</body>
+</html>
