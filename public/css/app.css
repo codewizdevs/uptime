@@ -416,6 +416,24 @@
   margin: 0.35rem 0;
   background: var(--tblr-border-color, rgba(101, 109, 119, 0.24));
 }
+
+/* On narrow viewports the right-anchored dropdown would overflow the left
+   edge of the screen (the toggle is way over on the right of the navbar).
+   Detach from the toggle and center the menu under the navbar instead.
+   Top offset clears the navbar so the toggle stays clickable to close. */
+@media (max-width: 575.98px) {
+  .dropdown-wrap .dropdown-menu {
+    position: fixed;
+    top: 6.75rem;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: min(360px, 92vw);
+    max-height: calc(100vh - 6rem);
+    overflow-y: auto;
+  }
+}
+
 .navbar-actions .btn-icon {
   width: 2.25rem;
   height: 2.25rem;
