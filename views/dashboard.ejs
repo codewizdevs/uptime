@@ -76,6 +76,7 @@
             { v: 'active',    l: 'Active',    i: 'ti-world' },
             { v: 'heartbeat', l: 'Heartbeat', i: 'ti-heartbeat' },
             { v: 'cert',      l: 'Cert',      i: 'ti-certificate' },
+            { v: 'domain',    l: 'Domain',    i: 'ti-hourglass' },
             { v: 'tcp',       l: 'TCP',       i: 'ti-plug-connected' },
             { v: 'ping',      l: 'Ping',      i: 'ti-wave-saw-tool' },
             { v: 'dns',       l: 'DNS',       i: 'ti-server-2' },
@@ -237,6 +238,8 @@
                 <i class="ti ti-wave-saw-tool"></i><span class="site-meta-text">Ping - <%= s.ping_host %><% if (s.ping_count > 1) { %> ×<%= s.ping_count %><% } %></span>
               <% } else if (s.monitor_type === 'dns') { %>
                 <i class="ti ti-server-2"></i><span class="site-meta-text">DNS <%= s.dns_record_type || 'A' %> - <%= s.dns_query %></span>
+              <% } else if (s.monitor_type === 'domain') { %>
+                <i class="ti ti-hourglass"></i><span class="site-meta-text">Domain - <%= s.whois_domain || '?' %></span>
               <% } else { %>
                 <i class="ti ti-world"></i><span class="site-meta-text"><%= s.url %></span>
               <% } %>
@@ -245,7 +248,13 @@
             <%
               var hasCertBadge = s.last_cert_days_remaining != null && s.cert_expiry_warn_days > 0;
               var certUrgent = hasCertBadge && s.last_cert_days_remaining <= s.cert_expiry_warn_days;
-              var hasFlags = s.cloudflare_mode || s.failure_threshold > 1 || s.paused || certUrgent;
+              var domainDays = null;
+              if (s.monitor_type === 'domain' && s.domain_expires_at) {
+                domainDays = Math.floor((new Date(s.domain_expires_at).getTime() - Date.now()) / 86400000);
+              }
+              var domainWarn = s.domain_expiry_warn_days == null ? 30 : s.domain_expiry_warn_days;
+              var domainUrgent = domainDays != null && domainWarn > 0 && domainDays <= domainWarn;
+              var hasFlags = s.cloudflare_mode || s.failure_threshold > 1 || s.paused || certUrgent || domainUrgent;
             %>
             <% if (hasFlags) { %>
               <div class="site-badges position-relative" style="z-index: 2;">
@@ -255,6 +264,12 @@
                   <span class="badge bg-<%= s.last_cert_days_remaining < 0 ? 'red' : 'yellow' %>-lt"
                         title="TLS cert <%= s.last_cert_days_remaining < 0 ? 'expired ' + (-s.last_cert_days_remaining) + ' days ago' : 'expires in ' + s.last_cert_days_remaining + ' days' %>">
                     <i class="ti ti-certificate me-1"></i><%= s.last_cert_days_remaining < 0 ? 'cert expired' : 'cert ' + s.last_cert_days_remaining + 'd' %>
+                  </span>
+                <% } %>
+                <% if (domainUrgent) { %>
+                  <span class="badge bg-<%= domainDays < 0 ? 'red' : 'yellow' %>-lt"
+                        title="Domain <%= domainDays < 0 ? 'expired ' + (-domainDays) + ' days ago' : 'expires in ' + domainDays + ' days' %>">
+                    <i class="ti ti-hourglass me-1"></i><%= domainDays < 0 ? 'domain expired' : 'domain ' + domainDays + 'd' %>
                   </span>
                 <% } %>
                 <% if (s.paused) { %><span class="badge bg-secondary-lt"><i class="ti ti-player-pause me-1"></i>paused</span><% } %>

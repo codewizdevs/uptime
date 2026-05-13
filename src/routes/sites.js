@@ -222,7 +222,7 @@ function pickTagIds(body) {
 
 const PAGE_SIZE = 52;
 const VALID_STATES = ['up', 'down', 'unknown', 'paused'];
-const VALID_TYPES = ['active', 'heartbeat', 'cert', 'tcp', 'ping', 'dns'];
+const VALID_TYPES = ['active', 'heartbeat', 'cert', 'tcp', 'ping', 'dns', 'domain'];
 
 function parseListFilters(query) {
   const q = String(query.q || '').trim().slice(0, 120);
