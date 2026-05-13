@@ -106,12 +106,33 @@ ALICE_SITE_ID=$(printf "%s" "$ALICE_SITE_LOC" | grep -oE '/sites/[0-9]+' | grep 
 [[ -n "$ALICE_SITE_ID" ]] || fail "alice POST /sites failed (loc=$ALICE_SITE_LOC)"
 pass "alice created monitor #$ALICE_SITE_ID"
 
-# Alice is blocked from admin pages.
+# Alice is blocked from admin pages but CAN access her own /settings/account
+# and the audit log. (Regression guard for the mount-relative req.path bug
+# that previously locked all non-admins out of /settings/account.)
 ALICE_BRANDING=$(status "$TMP/alice.jar" /settings/branding)
 ALICE_USERS=$(status "$TMP/alice.jar" /settings/users)
-[[ "$ALICE_BRANDING" = "403" ]] || fail "alice /settings/branding should be 403 (got $ALICE_BRANDING)"
-[[ "$ALICE_USERS"    = "403" ]] || fail "alice /settings/users should be 403 (got $ALICE_USERS)"
-pass "alice blocked from admin pages"
+ALICE_BACKUP=$(status "$TMP/alice.jar" /settings/backup)
+ALICE_TAGS=$(status "$TMP/alice.jar" /settings/tags)
+ALICE_MAINT=$(status "$TMP/alice.jar" /settings/maintenance)
+ALICE_SMTP=$(status "$TMP/alice.jar" /settings/smtp)
+ALICE_API_ADMIN=$(status "$TMP/alice.jar" /settings/api-tokens)
+ALICE_STATUS_CFG=$(status "$TMP/alice.jar" /settings/status-page)
+ALICE_ACCOUNT=$(status "$TMP/alice.jar" /settings/account)
+ALICE_AUDIT=$(status "$TMP/alice.jar" /settings/audit)
+[[ "$ALICE_BRANDING"   = "403" ]] || fail "alice /settings/branding should be 403 (got $ALICE_BRANDING)"
+[[ "$ALICE_USERS"      = "403" ]] || fail "alice /settings/users should be 403 (got $ALICE_USERS)"
+[[ "$ALICE_BACKUP"     = "403" ]] || fail "alice /settings/backup should be 403 (got $ALICE_BACKUP)"
+[[ "$ALICE_TAGS"       = "403" ]] || fail "alice /settings/tags should be 403 (got $ALICE_TAGS)"
+[[ "$ALICE_MAINT"      = "403" ]] || fail "alice /settings/maintenance should be 403 (got $ALICE_MAINT)"
+[[ "$ALICE_SMTP"       = "403" ]] || fail "alice /settings/smtp should be 403 (got $ALICE_SMTP)"
+[[ "$ALICE_API_ADMIN"  = "403" ]] || fail "alice /settings/api-tokens should be 403 (got $ALICE_API_ADMIN)"
+[[ "$ALICE_STATUS_CFG" = "403" ]] || fail "alice /settings/status-page should be 403 (got $ALICE_STATUS_CFG)"
+[[ "$ALICE_ACCOUNT"    = "200" ]] || fail "alice /settings/account should be 200 (got $ALICE_ACCOUNT)"
+[[ "$ALICE_AUDIT"      = "200" ]] || fail "alice /settings/audit should be 200 (got $ALICE_AUDIT)"
+# Non-admins also cannot trigger backup export — the destructive endpoint.
+ALICE_EXPORT=$(post_status "$TMP/alice.jar" /settings/backup/export "scope=all&include_channels=1")
+[[ "$ALICE_EXPORT" = "403" ]] || fail "alice POST /settings/backup/export should be 403 (got $ALICE_EXPORT)"
+pass "alice: admin pages 403, own account/audit 200, backup export blocked"
 
 # /api/sites: alice may see her own, not others.
 ALICE_API=$(curl -s -b "$TMP/alice.jar" -H "Accept: application/json" -H "X-Requested-With: XMLHttpRequest" "$BASE/api/sites?ids=$ALICE_SITE_ID,7,8")
@@ -145,7 +166,49 @@ login "$TMP/bob.jar" bob "$BOB_PW"
 [[ "$(post_status "$TMP/bob.jar" /sites/8/pause)" = "403" ]] || fail "bob POST /sites/8/pause should be 403"
 [[ "$(status "$TMP/bob.jar" /sites/7)"        = "403" ]] || fail "bob /sites/7 should be 403"
 [[ "$(status "$TMP/bob.jar" /settings/users)" = "403" ]] || fail "bob /settings/users should be 403"
-pass "bob is read-only on his site"
+# Bob (viewer) must also be able to reach his own account + audit pages.
+[[ "$(status "$TMP/bob.jar" /settings/account)" = "200" ]] || fail "bob /settings/account should be 200"
+[[ "$(status "$TMP/bob.jar" /settings/audit)"   = "200" ]] || fail "bob /settings/audit should be 200"
+[[ "$(status "$TMP/bob.jar" /settings/backup)"  = "403" ]] || fail "bob /settings/backup should be 403"
+pass "bob is read-only on his site, can reach his own account/audit"
+
+# ── 6b. must-change-password flow (regression guard for the bug fixed in
+#       commit "settings: fix mount-relative regex…") ─────────────────────
+info "6b. new user with must_change_password lands on /settings/account"
+node_run "(async()=>{
+  const u=require('./src/lib/users');
+  const b=await u.findByUsername('bob');
+  // Re-enable the must-change flag and reset the password.
+  await u.setPassword(b.id,'$BOB_PW',{mustChange:true});
+  process.exit(0);
+})().catch(e=>{console.error(e);process.exit(1)})"
+rm -f "$TMP/bob3.jar"
+curl -s -c "$TMP/bob3.jar" "$BASE/login" >/dev/null
+curl -s -b "$TMP/bob3.jar" -c "$TMP/bob3.jar" -X POST -d "username=bob&password=$BOB_PW" -o /dev/null "$BASE/login"
+# Dashboard should redirect to /settings/account, NOT 403.
+BOB_HOME_CODE=$(status "$TMP/bob3.jar" /)
+BOB_ACCOUNT_CODE=$(status "$TMP/bob3.jar" /settings/account)
+[[ "$BOB_HOME_CODE"    = "302" ]] || fail "bob with must_change_password / should 302 (got $BOB_HOME_CODE)"
+[[ "$BOB_ACCOUNT_CODE" = "200" ]] || fail "bob with must_change_password /settings/account should 200 (got $BOB_ACCOUNT_CODE)"
+# Now actually change the password through the UI and confirm flag clears.
+NEW_BOB_PW="bob-secret-rotated-67890"
+curl -s -b "$TMP/bob3.jar" -X POST \
+  --data-urlencode "current_password=$BOB_PW" \
+  --data-urlencode "new_password=$NEW_BOB_PW" \
+  --data-urlencode "repeat_password=$NEW_BOB_PW" \
+  -o /dev/null "$BASE/settings/account/password"
+# After change the dashboard should be reachable again.
+sleep 0.3
+BOB_HOME_AFTER=$(status "$TMP/bob3.jar" /)
+[[ "$BOB_HOME_AFTER" = "200" ]] || fail "bob after password change / should be 200 (got $BOB_HOME_AFTER)"
+# Restore bob's original password so the rest of the script keeps working.
+node_run "(async()=>{
+  const u=require('./src/lib/users');
+  const b=await u.findByUsername('bob');
+  await u.setPassword(b.id,'$BOB_PW',{mustChange:false});
+  process.exit(0);
+})().catch(e=>{console.error(e);process.exit(1)})"
+pass "must-change-password flow OK (regression of mount-relative bug)"
 
 # ── 7. alice API token ─────────────────────────────────────────────────
 info "7. alice API token respects ACL"

@@ -385,8 +385,10 @@ router.get('/metrics', async (req, res, next) => {
 });
 
 // ─── Friendly error handler scoped to /api/v1/* ──────────────────────────
+// NOTE: this middleware is mounted at '/api/v1', so `req.path` inside is the
+// path *relative* to the mount. Use `req.originalUrl` for the full URL in logs.
 router.use('/api/v1', (err, req, res, _next) => {
-  logger.error({ err, reqId: req.id, path: req.path }, 'api.error');
+  logger.error({ err, reqId: req.id, path: req.originalUrl }, 'api.error');
   res.status(500).json({ error: 'internal error', detail: err.message });
 });
 

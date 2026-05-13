@@ -34,9 +34,13 @@ const router = express.Router();
 // under /settings is admin-only (enforced below).
 // - /settings/account/*  → own password + own 2FA + own API tokens
 // - /settings/audit      → admins see all, editors/viewers see only their own
+//
+// NOTE: this middleware is mounted at '/settings' below, so inside the handler
+// `req.path` is the path *relative* to the mount point (e.g. '/account' for a
+// request to '/settings/account'). The regexes below match the relative path.
 const NON_ADMIN_SETTINGS_PATHS = [
-  /^\/settings\/account(\/|$)/,
-  /^\/settings\/audit(\/|$)/,
+  /^\/account(\/|$)/,
+  /^\/audit(\/|$)/,
 ];
 
 router.use('/settings', (req, res, next) => {

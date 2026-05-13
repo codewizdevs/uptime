@@ -5,10 +5,19 @@ const db = require('../db');
 const backup = require('../lib/backup');
 const channels = require('../lib/channels');
 const logger = require('../logger');
+const acl = require('../lib/acl');
 
 const router = express.Router();
 
 const importBodyParser = express.urlencoded({ extended: true, limit: '16mb' });
+
+// Defense in depth: backup endpoints expose channel webhook URLs, the SMTP
+// password (when opted in), and can overwrite any monitor / channel via
+// import. They are admin-only — and we say so explicitly here so the guard
+// survives any reordering of the route mounts in server.js (the implicit
+// /settings gate in routes/settings.js would otherwise be the only thing
+// keeping non-admins out).
+const requireAdmin = acl.requireRole('admin');
 
 function safeFilename(prefix) {
   const d = new Date();
@@ -26,7 +35,7 @@ function parseSelectedIds(body) {
     .filter((n) => Number.isFinite(n) && n > 0);
 }
 
-router.get('/settings/backup', async (req, res, next) => {
+router.get('/settings/backup', requireAdmin, async (req, res, next) => {
   try {
     const [sites, allChannels] = await Promise.all([
       db.query('SELECT id, name, monitor_type, paused FROM sites ORDER BY name ASC'),
@@ -43,7 +52,7 @@ router.get('/settings/backup', async (req, res, next) => {
   }
 });
 
-router.post('/settings/backup/export', async (req, res, next) => {
+router.post('/settings/backup/export', requireAdmin, async (req, res, next) => {
   try {
     const b = req.body || {};
     const scope = b.scope === 'selected' ? 'selected' : 'all';
@@ -81,7 +90,7 @@ router.post('/settings/backup/export', async (req, res, next) => {
   }
 });
 
-router.post('/settings/backup/import', importBodyParser, async (req, res, next) => {
+router.post('/settings/backup/import', requireAdmin, importBodyParser, async (req, res, next) => {
   try {
     const b = req.body || {};
     const jsonText = typeof b.payload === 'string' ? b.payload : '';
