@@ -8,6 +8,7 @@ const cert = require('./cert');
 const tcpProbe = require('./tcp');
 const pingProbe = require('./ping');
 const dnsProbe = require('./dnscheck');
+const whois = require('./whois');
 const logger = require('../logger');
 
 const gunzipAsync = promisify(zlib.gunzip);
@@ -299,12 +300,87 @@ async function runDnsCheck(site) {
   };
 }
 
+// Domain expiry monitor (WHOIS / RDAP).
+// State semantics (deliberately different from typical probes):
+//   - lookup fails / unreachable     → isUp: null (inconclusive, not 'down')
+//   - lookup succeeds, expiry parsed → isUp: 1 (up) or 0 if already expired
+//   - lookup succeeds, expiry redacted by registry → isUp: null (unknown)
+// The "domain expiring within warn_days" alert is fired by the monitor
+// processResult path via persistDomainInfo, not here.
+async function runDomainCheck(site) {
+  const log = logger.child({ siteId: site.id, siteName: site.name, monitorType: 'domain' });
+  const domain = (site.whois_domain || '').trim();
+  if (!domain) {
+    return { isUp: 0, statusCode: null, responseTimeMs: null, errorMessage: 'no domain configured', challenged: false, domain: null };
+  }
+  const timeoutMs = Math.max(3000, site.timeout_ms || 12000);
+  try {
+    const info = await whois.inspect(domain, { timeoutMs });
+    log.trace({ domain, source: info.source, days: info.days_remaining }, 'whois.check_done');
+    if (!info.ok) {
+      // RDAP-authoritative "domain not found" → down (clear outage signal).
+      return {
+        isUp: 0,
+        statusCode: null,
+        responseTimeMs: info.response_time_ms || null,
+        errorMessage: info.error || 'domain lookup failed',
+        challenged: false,
+        domain: null,
+      };
+    }
+    if (info.days_remaining == null) {
+      // Lookup worked, but registry redacted expiry — stay 'unknown', don't
+      // overwrite stale-but-correct data, don't flip the user's monitor red.
+      return {
+        isUp: null,
+        statusCode: null,
+        responseTimeMs: info.response_time_ms,
+        errorMessage: 'expiry not parseable from registry response',
+        challenged: false,
+        domain: info,
+      };
+    }
+    if (info.days_remaining < 0) {
+      return {
+        isUp: 0,
+        statusCode: null,
+        responseTimeMs: info.response_time_ms,
+        errorMessage: `domain expired ${-info.days_remaining} days ago`,
+        challenged: false,
+        domain: info,
+      };
+    }
+    return {
+      isUp: 1,
+      statusCode: null,
+      responseTimeMs: info.response_time_ms,
+      errorMessage: null,
+      challenged: false,
+      domain: info,
+    };
+  } catch (err) {
+    log.debug({ err: err.message }, 'whois.check_failed');
+    // Network / DNS / registry-side problems are *not* the site's fault.
+    // Keep state as 'unknown' (isUp: null) rather than marking the user's
+    // monitor down on every registry hiccup.
+    return {
+      isUp: null,
+      statusCode: null,
+      responseTimeMs: null,
+      errorMessage: `whois: ${err?.message || err}`,
+      challenged: false,
+      domain: null,
+    };
+  }
+}
+
 async function runCheck(site) {
   const log = logger.child({ siteId: site.id, siteName: site.name });
   if (site.monitor_type === 'cert') return runCertCheck(site);
   if (site.monitor_type === 'tcp') return runTcpCheck(site);
   if (site.monitor_type === 'ping') return runPingCheck(site);
   if (site.monitor_type === 'dns') return runDnsCheck(site);
+  if (site.monitor_type === 'domain') return runDomainCheck(site);
   const checkType = site.check_type || 'status';
   // HEAD probe is only valid when we don't need the response body. Any
   // assertion against the body (string / json) requires GET.
@@ -522,6 +598,7 @@ async function evaluateHeartbeat(site) {
 module.exports = {
   runCheck,
   runCertCheck,
+  runDomainCheck,
   runTcpCheck,
   runPingCheck,
   runDnsCheck,

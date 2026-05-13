@@ -11,7 +11,7 @@ const CHANNEL_TYPES = [
   'discord', 'webhook', 'email',
   'slack', 'telegram', 'ntfy', 'gotify', 'pushover', 'mattermost', 'teams',
 ];
-const EVENT_TYPES = ['down', 'recovered', 'challenged', 'cert_expiring', 'test'];
+const EVENT_TYPES = ['down', 'recovered', 'challenged', 'cert_expiring', 'domain_expiring', 'test'];
 
 // Channel-type metadata used by the UI (icon, badge color, human label).
 // Single source of truth — views look this up via channels.CHANNEL_META.
@@ -62,17 +62,22 @@ const DEFAULT_TEMPLATES = {
       title: CERT_EXPIRING_DEFAULT_DISCORD,
       body: '**URL:** `{{site_url}}`\n**Subject:** `{{cert_subject}}`\n**Issuer:** `{{cert_issuer}}`\n**Expires:** {{cert_valid_to}}',
     },
+    domain_expiring: {
+      title: ':hourglass_flowing_sand: Domain {{domain}} expires in {{domain_days_remaining}} days',
+      body: '**Registrar:** {{domain_registrar}}\n**Expires:** {{domain_expires_at}}\n**Status:** `{{domain_status}}`',
+    },
     test: {
       title: ':white_check_mark: Test message from Uptime',
       body: 'This is a test of the Discord channel. If you see this, your webhook works.',
     },
   },
   webhook: {
-    down:          { title: '', body: DEFAULT_WEBHOOK_TEMPLATE },
-    recovered:     { title: '', body: DEFAULT_WEBHOOK_TEMPLATE },
-    challenged:    { title: '', body: DEFAULT_WEBHOOK_TEMPLATE },
-    cert_expiring: { title: '', body: DEFAULT_WEBHOOK_TEMPLATE },
-    test:          { title: '', body: DEFAULT_WEBHOOK_TEMPLATE },
+    down:            { title: '', body: DEFAULT_WEBHOOK_TEMPLATE },
+    recovered:       { title: '', body: DEFAULT_WEBHOOK_TEMPLATE },
+    challenged:      { title: '', body: DEFAULT_WEBHOOK_TEMPLATE },
+    cert_expiring:   { title: '', body: DEFAULT_WEBHOOK_TEMPLATE },
+    domain_expiring: { title: '', body: DEFAULT_WEBHOOK_TEMPLATE },
+    test:            { title: '', body: DEFAULT_WEBHOOK_TEMPLATE },
   },
   email: {
     down: {
@@ -90,6 +95,10 @@ const DEFAULT_TEMPLATES = {
     cert_expiring: {
       title: '[Cert] {{site_name}} TLS cert expires in {{cert_days_remaining}}d',
       body: 'The TLS certificate for {{site_name}} expires in {{cert_days_remaining}} days.\n\nURL: {{site_url}}\nSubject: {{cert_subject}}\nIssuer: {{cert_issuer}}\nNot after: {{cert_valid_to}}\n\n--\nUptime monitor',
+    },
+    domain_expiring: {
+      title: '[Domain] {{domain}} expires in {{domain_days_remaining}}d',
+      body: 'The domain {{domain}} expires in {{domain_days_remaining}} days.\n\nRegistrar: {{domain_registrar}}\nExpires: {{domain_expires_at}}\nStatus: {{domain_status}}\n\n--\nUptime monitor',
     },
     test: {
       title: '[Test] Uptime monitor email',
@@ -113,6 +122,10 @@ const DEFAULT_TEMPLATES = {
       title: ':warning: TLS cert for {{site_name}} expires in {{cert_days_remaining}}d',
       body: '*URL:* {{site_url}}\n*Subject:* `{{cert_subject}}`\n*Issuer:* `{{cert_issuer}}`\n*Not after:* {{cert_valid_to}}',
     },
+    domain_expiring: {
+      title: ':hourglass_flowing_sand: Domain {{domain}} expires in {{domain_days_remaining}}d',
+      body: '*Registrar:* {{domain_registrar}}\n*Expires:* {{domain_expires_at}}\n*Status:* `{{domain_status}}`',
+    },
     test: {
       title: ':white_check_mark: Test from Uptime',
       body: 'Slack channel works. This is sample data filled in.',
@@ -134,6 +147,10 @@ const DEFAULT_TEMPLATES = {
     cert_expiring: {
       title: '⚠️ <b>{{site_name}}</b> TLS cert expires in {{cert_days_remaining}}d',
       body: 'URL: <code>{{site_url}}</code>\nSubject: <code>{{cert_subject}}</code>\nIssuer: <code>{{cert_issuer}}</code>\nNot after: {{cert_valid_to}}',
+    },
+    domain_expiring: {
+      title: '⏳ Domain <b>{{domain}}</b> expires in {{domain_days_remaining}}d',
+      body: 'Registrar: <code>{{domain_registrar}}</code>\nExpires: {{domain_expires_at}}\nStatus: <code>{{domain_status}}</code>',
     },
     test: {
       title: '✅ Test from Uptime',
@@ -157,6 +174,10 @@ const DEFAULT_TEMPLATES = {
       title: '⚠️ {{site_name}} TLS cert expires in {{cert_days_remaining}}d',
       body: '{{site_url}}\nIssuer: {{cert_issuer}}\nNot after: {{cert_valid_to}}',
     },
+    domain_expiring: {
+      title: '⏳ Domain {{domain}} expires in {{domain_days_remaining}}d',
+      body: 'Registrar: {{domain_registrar}}\nExpires: {{domain_expires_at}}\nStatus: {{domain_status}}',
+    },
     test: {
       title: '✅ Test from Uptime',
       body: 'Ntfy channel works.',
@@ -178,6 +199,10 @@ const DEFAULT_TEMPLATES = {
     cert_expiring: {
       title: '⚠️ {{site_name}} TLS cert expires in {{cert_days_remaining}}d',
       body: 'URL: {{site_url}}\nIssuer: {{cert_issuer}}\nNot after: {{cert_valid_to}}',
+    },
+    domain_expiring: {
+      title: '⏳ Domain {{domain}} expires in {{domain_days_remaining}}d',
+      body: 'Registrar: {{domain_registrar}}\nExpires: {{domain_expires_at}}\nStatus: {{domain_status}}',
     },
     test: {
       title: '✅ Test from Uptime',
@@ -201,6 +226,10 @@ const DEFAULT_TEMPLATES = {
       title: 'CERT: {{site_name}} ({{cert_days_remaining}}d left)',
       body: '{{site_url}}\nIssuer: {{cert_issuer}}\nNot after: {{cert_valid_to}}',
     },
+    domain_expiring: {
+      title: 'DOMAIN: {{domain}} ({{domain_days_remaining}}d left)',
+      body: 'Registrar: {{domain_registrar}}\nExpires: {{domain_expires_at}}\nStatus: {{domain_status}}',
+    },
     test: {
       title: 'Test from Uptime',
       body: 'Pushover channel works.',
@@ -223,6 +252,10 @@ const DEFAULT_TEMPLATES = {
       title: ':warning: TLS cert for {{site_name}} expires in {{cert_days_remaining}}d',
       body: '**URL:** {{site_url}}\n**Subject:** `{{cert_subject}}`\n**Issuer:** `{{cert_issuer}}`\n**Not after:** {{cert_valid_to}}',
     },
+    domain_expiring: {
+      title: ':hourglass_flowing_sand: Domain {{domain}} expires in {{domain_days_remaining}}d',
+      body: '**Registrar:** {{domain_registrar}}\n**Expires:** {{domain_expires_at}}\n**Status:** `{{domain_status}}`',
+    },
     test: {
       title: ':white_check_mark: Test from Uptime',
       body: 'Mattermost channel works.',
@@ -244,6 +277,10 @@ const DEFAULT_TEMPLATES = {
     cert_expiring: {
       title: '⚠️ {{site_name}} TLS cert expires in {{cert_days_remaining}}d',
       body: '**URL:** {{site_url}}  \n**Subject:** `{{cert_subject}}`  \n**Issuer:** `{{cert_issuer}}`  \n**Not after:** {{cert_valid_to}}',
+    },
+    domain_expiring: {
+      title: '⏳ Domain {{domain}} expires in {{domain_days_remaining}}d',
+      body: '**Registrar:** {{domain_registrar}}  \n**Expires:** {{domain_expires_at}}  \n**Status:** `{{domain_status}}`',
     },
     test: {
       title: '✅ Test from Uptime',
@@ -456,11 +493,11 @@ async function setSiteChannels(siteId, channelIds) {
   await db.query(`INSERT INTO site_channels (site_id, channel_id) VALUES ${values}`, params);
 }
 
-const COLORS = { down: 0xd6336c, recovered: 0x2fb344, challenged: 0xf59f00, cert_expiring: 0xf59f00, test: 0x4263eb };
+const COLORS = { down: 0xd6336c, recovered: 0x2fb344, challenged: 0xf59f00, cert_expiring: 0xf59f00, domain_expiring: 0xf59f00, test: 0x4263eb };
 // Hex strings for channels that want "#ff0000" form.
 const COLORS_HEX = {
   down: '#d6336c', recovered: '#2fb344', challenged: '#f59f00',
-  cert_expiring: '#f59f00', test: '#4263eb',
+  cert_expiring: '#f59f00', domain_expiring: '#f59f00', test: '#4263eb',
 };
 // Ntfy tag suggestions per event (renders as emoji on the receiver).
 const NTFY_DEFAULT_TAGS = {
@@ -468,11 +505,12 @@ const NTFY_DEFAULT_TAGS = {
   recovered: ['white_check_mark', 'green_circle'],
   challenged: ['shield', 'cloud'],
   cert_expiring: ['warning', 'lock'],
+  domain_expiring: ['hourglass_flowing_sand', 'warning'],
   test: ['white_check_mark'],
 };
 // Pushover priority mapping: -2..2 (silent..emergency). We respect channel
 // config but fall back to a sensible per-event default.
-const PUSHOVER_DEFAULT_PRIORITY = { down: 1, recovered: 0, challenged: 0, cert_expiring: 0, test: 0 };
+const PUSHOVER_DEFAULT_PRIORITY = { down: 1, recovered: 0, challenged: 0, cert_expiring: 0, domain_expiring: 0, test: 0 };
 
 function buildDiscordPayload(event, vars, channel) {
   const titleTpl = pickTemplate(channel, event, 'title');
@@ -808,11 +846,11 @@ async function testChannel(channelId) {
 }
 
 const PLACEHOLDERS = [
-  { key: 'event', desc: 'down | recovered | challenged | cert_expiring | test' },
+  { key: 'event', desc: 'down | recovered | challenged | cert_expiring | domain_expiring | test' },
   { key: 'state', desc: 'down | up | challenged | test' },
   { key: 'site_name', desc: 'Monitor name' },
   { key: 'site_url', desc: 'Monitored URL (active monitors)' },
-  { key: 'monitor_type', desc: 'active | heartbeat | cert | tcp | ping | dns' },
+  { key: 'monitor_type', desc: 'active | heartbeat | cert | tcp | ping | dns | domain' },
   { key: 'error', desc: 'Failure reason / error message' },
   { key: 'status_code', desc: 'HTTP status of the failed/succeeded check' },
   { key: 'response_time_ms', desc: 'Response time in milliseconds' },
@@ -823,6 +861,11 @@ const PLACEHOLDERS = [
   { key: 'cert_subject', desc: 'TLS cert subject CN (cert_expiring)' },
   { key: 'cert_issuer', desc: 'TLS cert issuer CN (cert_expiring)' },
   { key: 'cert_valid_to', desc: 'TLS cert expiry timestamp (cert_expiring)' },
+  { key: 'domain', desc: 'Registered domain (domain_expiring)' },
+  { key: 'domain_days_remaining', desc: 'Days until the domain expires (domain_expiring)' },
+  { key: 'domain_expires_at', desc: 'Domain expiry timestamp (domain_expiring)' },
+  { key: 'domain_registrar', desc: 'Domain registrar name (domain_expiring)' },
+  { key: 'domain_status', desc: 'EPP status flags (domain_expiring)' },
   { key: 'timestamp', desc: 'ISO 8601 timestamp' },
   { key: 'timestamp_human', desc: 'Human-readable local time' },
 ];

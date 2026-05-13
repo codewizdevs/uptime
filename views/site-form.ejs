@@ -25,6 +25,7 @@
           <option value="active"    <%= site.monitor_type === 'active'    ? 'selected' : '' %>>Active - we ping the URL (HTTP/HTTPS)</option>
           <option value="heartbeat" <%= site.monitor_type === 'heartbeat' ? 'selected' : '' %>>Heartbeat - the service pings us</option>
           <option value="cert"      <%= site.monitor_type === 'cert'      ? 'selected' : '' %>>Certificate - TLS handshake only (no HTTP)</option>
+          <option value="domain"    <%= site.monitor_type === 'domain'    ? 'selected' : '' %>>Domain - WHOIS / RDAP expiry tracking</option>
           <option value="tcp"       <%= site.monitor_type === 'tcp'       ? 'selected' : '' %>>TCP - open a socket to host:port</option>
           <option value="ping"      <%= site.monitor_type === 'ping'      ? 'selected' : '' %>>Ping - ICMP echo</option>
           <option value="dns"       <%= site.monitor_type === 'dns'       ? 'selected' : '' %>>DNS - resolve and match record</option>
@@ -257,6 +258,56 @@
         <label class="form-label">Failure threshold</label>
         <input type="number" name="failure_threshold_cert" class="form-control" min="1" value="<%= site.failure_threshold || 1 %>" data-mirror="failure_threshold">
       </div>
+    </div>
+  </div>
+
+  <div class="card-body border-top" data-section="domain" <%= site.monitor_type !== 'domain' ? 'hidden' : '' %>>
+    <h3 class="card-title">Domain expiry monitor</h3>
+    <p class="card-subtitle text-secondary mb-3">
+      Looks up the registered domain via RDAP (preferred) then WHOIS, parses the expiry date, and
+      alerts when it gets close. Registry data changes once a year and registries rate-limit hard,
+      so we clamp the interval to a minimum of 12 hours. No HTTP / TLS request is made against the
+      site itself.
+    </p>
+    <div class="row g-3">
+      <div class="col-md-8">
+        <label class="form-label required">Domain</label>
+        <input type="text" name="whois_domain" class="form-control"
+               value="<%= site.whois_domain || '' %>" placeholder="example.com">
+        <div class="form-hint">Use the apex / registered domain — not a subdomain. <code>www.</code> and URL prefixes are stripped automatically.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Warn when expires within (days)</label>
+        <input type="number" name="domain_expiry_warn_days" class="form-control" min="0" max="365"
+               value="<%= site.domain_expiry_warn_days == null ? 30 : site.domain_expiry_warn_days %>">
+        <div class="form-hint">Re-alerts at 30 / 14 / 7 / 3 / 1 / 0 day bands.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Interval (seconds)</label>
+        <input type="number" name="interval_seconds_domain" class="form-control" min="43200"
+               value="<%= site.monitor_type === 'domain' ? site.interval_seconds : 86400 %>" data-mirror="interval_seconds">
+        <div class="form-hint">Minimum 12 h (43200). Default 24 h.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Timeout (ms)</label>
+        <input type="number" name="timeout_ms_domain" class="form-control" min="2000"
+               value="<%= site.monitor_type === 'domain' ? site.timeout_ms : 12000 %>" data-mirror="timeout_ms">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Failure threshold</label>
+        <input type="number" name="failure_threshold_domain" class="form-control" min="1"
+               value="<%= site.failure_threshold || 1 %>" data-mirror="failure_threshold">
+      </div>
+      <% if (site.id && site.monitor_type === 'domain' && site.domain_expires_at) { %>
+        <div class="col-12">
+          <div class="alert alert-secondary mb-0 small">
+            Last seen: domain <strong><%= site.whois_domain %></strong> expires
+            <strong><%= site.domain_expires_at %></strong>
+            <% if (site.domain_registrar) { %>(registrar: <strong><%= site.domain_registrar %></strong>)<% } %>
+            <% if (site.domain_status) { %>; status: <code><%= site.domain_status %></code><% } %>.
+          </div>
+        </div>
+      <% } %>
     </div>
   </div>
 

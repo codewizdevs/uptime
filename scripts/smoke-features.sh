@@ -150,16 +150,33 @@ HB_ID=$(create_monitor heartbeat "\
   --data-urlencode heartbeat_grace_seconds=30 \
   --data-urlencode heartbeat_schedule_kind=interval")
 
-pass "created HTTP=$HTTP_ID  TCP=$TCP_ID  PING=$PING_ID  DNS=$DNS_ID  CERT=$CERT_ID  HB=$HB_ID"
+DOMAIN_ID=$(create_monitor domain "\
+  --data-urlencode name=ft-domain \
+  --data-urlencode monitor_type=domain \
+  --data-urlencode interval_seconds=86400 \
+  --data-urlencode timeout_ms=12000 \
+  --data-urlencode failure_threshold=1 \
+  --data-urlencode heartbeat_grace_seconds=60 \
+  --data-urlencode whois_domain=https://www.example.com/ \
+  --data-urlencode domain_expiry_warn_days=30")
+
+# Domain probes should be clamped to ≥12h interval no matter what was sent.
+DOMAIN_INTERVAL=$(node_run "require('./src/db').query('SELECT interval_seconds FROM sites WHERE id=?',[ $DOMAIN_ID ]).then(r=>{console.log(r[0]?.interval_seconds||0);process.exit(0)})")
+[[ "$DOMAIN_INTERVAL" -ge 43200 ]] || fail "domain interval should be clamped to >=43200, got $DOMAIN_INTERVAL"
+# Apex-stripping should reduce "https://www.example.com/" to "example.com".
+DOMAIN_INPUT=$(node_run "require('./src/db').query('SELECT whois_domain FROM sites WHERE id=?',[ $DOMAIN_ID ]).then(r=>{console.log(r[0]?.whois_domain||'');process.exit(0)})")
+[[ "$DOMAIN_INPUT" = "example.com" ]] || fail "domain input not normalized: got '$DOMAIN_INPUT'"
+
+pass "created HTTP=$HTTP_ID  TCP=$TCP_ID  PING=$PING_ID  DNS=$DNS_ID  CERT=$CERT_ID  HB=$HB_ID  DOMAIN=$DOMAIN_ID"
 
 # Site detail must render for each.
-for id in "$HTTP_ID" "$TCP_ID" "$PING_ID" "$DNS_ID" "$CERT_ID" "$HB_ID"; do
+for id in "$HTTP_ID" "$TCP_ID" "$PING_ID" "$DNS_ID" "$CERT_ID" "$HB_ID" "$DOMAIN_ID"; do
   [[ "$(status "$JAR" /sites/$id)" = "200" ]] || fail "/sites/$id should be 200"
 done
 pass "/sites/<id> renders for every type"
 
 # Pause + resume each.
-for id in "$HTTP_ID" "$TCP_ID" "$PING_ID" "$DNS_ID" "$CERT_ID" "$HB_ID"; do
+for id in "$HTTP_ID" "$TCP_ID" "$PING_ID" "$DNS_ID" "$CERT_ID" "$HB_ID" "$DOMAIN_ID"; do
   [[ "$(post_status "$JAR" /sites/$id/pause)"  = "302" ]] || fail "pause $id"
   [[ "$(post_status "$JAR" /sites/$id/pause)"  = "302" ]] || fail "resume $id"
 done
@@ -167,24 +184,31 @@ pass "pause/resume works on every type"
 
 # ─── 3. Trigger check-now on each non-heartbeat monitor; wait for result ─
 info "3. check-now on each active monitor, verify state updates"
-for id in "$HTTP_ID" "$TCP_ID" "$PING_ID" "$DNS_ID" "$CERT_ID"; do
+for id in "$HTTP_ID" "$TCP_ID" "$PING_ID" "$DNS_ID" "$CERT_ID" "$DOMAIN_ID"; do
   [[ "$(post_status "$JAR" /sites/$id/check-now)" = "302" ]] || fail "check-now $id"
 done
 # Probes are async; give them up to 10s to finish before reading state.
 # Verification: every non-heartbeat monitor must have at least one row in
 # `checks` (last_checked_at lives there, not on the sites table) and a
 # resolved current_state of up/down.
-sleep 8
+sleep 10
 node_run "(async()=>{
   const db=require('./src/db');
-  const rows=await db.query(\"SELECT id,name,current_state FROM sites WHERE name LIKE 'ft-%' ORDER BY id ASC\");
+  const rows=await db.query(\"SELECT id,name,current_state,domain_expires_at,domain_registrar FROM sites WHERE name LIKE 'ft-%' ORDER BY id ASC\");
   for (const r of rows) {
     if (r.name === 'ft-heartbeat') continue;
     const c = await db.query('SELECT COUNT(*) c FROM checks WHERE site_id=?',[ r.id ]);
     if (!c[0].c) { console.error(r.name+' has 0 checks'); process.exit(1); }
-    if (!['up','down'].includes(r.current_state)) {
-      console.error(r.name+' state='+r.current_state); process.exit(1);
-    }
+    // Domain probes may legitimately return 'unknown' if the registry is
+    // unreachable or redacts expiry — we accept up | down | unknown for them.
+    const ok = r.name === 'ft-domain'
+      ? ['up','down','unknown'].includes(r.current_state)
+      : ['up','down'].includes(r.current_state);
+    if (!ok) { console.error(r.name+' state='+r.current_state); process.exit(1); }
+  }
+  const dom = rows.find(r => r.name === 'ft-domain');
+  if (dom && dom.current_state === 'up' && !dom.domain_expires_at) {
+    console.error('ft-domain is up but expiry not persisted'); process.exit(1);
   }
   process.exit(0);
 })().catch(e=>{console.error(e);process.exit(1)})"
@@ -338,7 +362,7 @@ curl -s -b "$JAR" -X POST \
 node_run "
 const p = JSON.parse(require('fs').readFileSync('$TMP/backup-all.json','utf8'));
 if (!p.version || !p.monitors || !Array.isArray(p.monitors)) { console.error('not a valid backup'); process.exit(1); }
-if (p.monitors.length < 6) { console.error('expected >=6 monitors, got '+p.monitors.length); process.exit(1); }
+if (p.monitors.length < 7) { console.error('expected >=7 monitors, got '+p.monitors.length); process.exit(1); }
 if (!Array.isArray(p.channels) || p.channels.length < 10) { console.error('channels missing, got '+(p.channels||[]).length); process.exit(1); }
 if (!p.app) { console.error('missing app marker'); process.exit(1); }
 if (!p.counts || typeof p.counts !== 'object') { console.error('missing counts'); process.exit(1); }
@@ -445,7 +469,7 @@ pass "data retention prune runs cleanly"
 
 # ─── CLEANUP ─────────────────────────────────────────────────────────────
 info "cleanup: delete test sites, channels, tokens"
-for id in "$HTTP_ID" "$TCP_ID" "$PING_ID" "$DNS_ID" "$CERT_ID" "$HB_ID"; do
+for id in "$HTTP_ID" "$TCP_ID" "$PING_ID" "$DNS_ID" "$CERT_ID" "$HB_ID" "$DOMAIN_ID"; do
   post_status "$JAR" /sites/$id/delete >/dev/null || true
 done
 for id in "$CH_DISCORD" "$CH_SLACK" "$CH_TG" "$CH_NTFY" "$CH_GOTIFY" "$CH_PUSH" "$CH_MM" "$CH_TEAMS" "$CH_EMAIL" "$CH_WEBHOOK"; do

@@ -6,7 +6,7 @@ function buildVars(event, site, payload = {}) {
   const now = new Date();
   const stateByEvent = {
     down: 'down', recovered: 'up', challenged: 'challenged',
-    cert_expiring: 'up', test: 'test',
+    cert_expiring: 'up', domain_expiring: 'up', test: 'test',
   };
   return {
     event,
@@ -26,6 +26,11 @@ function buildVars(event, site, payload = {}) {
     cert_subject: payload.cert_subject ?? site?.last_cert_subject ?? '',
     cert_issuer: payload.cert_issuer ?? site?.last_cert_issuer ?? '',
     cert_valid_to: payload.cert_valid_to ?? site?.last_cert_valid_to ?? '',
+    domain: payload.domain ?? site?.whois_domain ?? '',
+    domain_days_remaining: payload.domain_days_remaining ?? '',
+    domain_expires_at: payload.domain_expires_at ?? site?.domain_expires_at ?? '',
+    domain_registrar: payload.domain_registrar ?? site?.domain_registrar ?? '',
+    domain_status: payload.domain_status ?? site?.domain_status ?? '',
     timestamp: now.toISOString(),
     timestamp_human: now.toLocaleString(),
   };
@@ -41,6 +46,11 @@ function sampleVars() {
     cert_subject: 'example.com',
     cert_issuer: "Let's Encrypt R3",
     cert_valid_to: '2026-06-01T00:00:00Z',
+    domain: 'example.com',
+    domain_days_remaining: 27,
+    domain_expires_at: '2026-06-15T00:00:00Z',
+    domain_registrar: 'Sample Registrar, Inc.',
+    domain_status: 'clientTransferProhibited',
   });
 }
 

@@ -580,6 +580,20 @@ async function run() {
   await addColumn('settings', 'brand_credits_text',    'TEXT NULL', 'VARCHAR(120) NULL');
   await addColumn('settings', 'brand_credits_url',     'TEXT NULL', 'VARCHAR(512) NULL');
 
+  // Phase 15 — Domain expiry (WHOIS / RDAP) monitor type.
+  // `whois_domain` is the apex registered domain we look up (e.g. example.com).
+  // `domain_expires_at` and friends are snapshots from the last successful
+  // probe so the dashboard and notifier can render even when the registry
+  // is unreachable. `domain_alerted_at_days` mirrors `cert_expiry_alerted_at_days`
+  // so we don't spam — re-alert only when crossing 30/14/7/3/1/0d bands.
+  await addColumn('sites', 'whois_domain',             'TEXT NULL',                  'VARCHAR(255) NULL');
+  await addColumn('sites', 'domain_expiry_warn_days',  'INTEGER NOT NULL DEFAULT 30','INT NOT NULL DEFAULT 30');
+  await addColumn('sites', 'domain_expires_at',        'TEXT NULL',                  'DATETIME(3) NULL');
+  await addColumn('sites', 'domain_registrar',         'TEXT NULL',                  'VARCHAR(255) NULL');
+  await addColumn('sites', 'domain_status',            'TEXT NULL',                  'VARCHAR(120) NULL');
+  await addColumn('sites', 'domain_last_checked_at',   'TEXT NULL',                  'DATETIME(3) NULL');
+  await addColumn('sites', 'domain_alerted_at_days',   'INTEGER NULL',               'INT NULL');
+
   // Binary uploads (logo / favicon). Stored inline rather than on disk so
   // backup/import is a single JSON file and there are no FS perms to worry
   // about. One row per `kind` ("logo" | "favicon"). updated_at drives the

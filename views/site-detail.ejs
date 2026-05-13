@@ -64,6 +64,58 @@
   </div>
 <% } %>
 
+<% if (site.monitor_type === 'domain') {
+     var dDays = null;
+     if (site.domain_expires_at) {
+       dDays = Math.floor((new Date(site.domain_expires_at).getTime() - Date.now()) / 86400000);
+     }
+     var dBadge = 'secondary';
+     if (dDays != null) {
+       if (dDays < 0) dBadge = 'red';
+       else if (dDays <= 7) dBadge = 'red';
+       else if (dDays <= (site.domain_expiry_warn_days || 30)) dBadge = 'orange';
+       else dBadge = 'green';
+     }
+%>
+  <div class="card mb-3">
+    <div class="card-body py-3">
+      <div class="row g-3 align-items-center">
+        <div class="col-auto"><i class="ti ti-hourglass fs-2 text-secondary"></i></div>
+        <div class="col">
+          <div class="text-secondary small">Domain</div>
+          <div class="fw-semibold fs-3"><%= site.whois_domain || '—' %></div>
+        </div>
+        <div class="col-md-3 col-6">
+          <div class="text-secondary small">Expires in</div>
+          <div>
+            <% if (dDays == null) { %>
+              <span class="badge bg-secondary-lt">unknown</span>
+            <% } else if (dDays < 0) { %>
+              <span class="badge bg-red-lt"><%= -dDays %> days ago</span>
+            <% } else { %>
+              <span class="badge bg-<%= dBadge %>-lt"><%= dDays %> days</span>
+            <% } %>
+          </div>
+        </div>
+        <div class="col-md-3 col-6">
+          <div class="text-secondary small">Expiry date</div>
+          <div class="small"><%= site.domain_expires_at || '—' %></div>
+        </div>
+        <div class="col-md-3 col-6">
+          <div class="text-secondary small">Registrar</div>
+          <div class="small text-truncate"><%= site.domain_registrar || '—' %></div>
+        </div>
+        <% if (site.domain_status) { %>
+          <div class="col-12">
+            <div class="text-secondary small">EPP status</div>
+            <code class="small"><%= site.domain_status %></code>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+<% } %>
+
 <% if (typeof attachedChannels !== 'undefined' && attachedChannels.length > 0) { %>
   <div class="card mb-3 attached-channels-card">
     <div class="card-body py-2">

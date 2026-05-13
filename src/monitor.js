@@ -166,6 +166,48 @@ async function markCertAlerted(site, days) {
   );
 }
 
+async function persistDomainInfo(site, domainInfo) {
+  if (!domainInfo) return;
+  await db.query(
+    `UPDATE sites
+        SET domain_expires_at        = ?,
+            domain_registrar         = ?,
+            domain_status            = ?,
+            domain_last_checked_at   = ${db.nowMs()}
+      WHERE id = ?`,
+    [
+      domainInfo.expires_at || null,
+      domainInfo.registrar || null,
+      domainInfo.status || null,
+      site.id,
+    ]
+  );
+}
+
+// Same band logic as cert expiry — fire once at first crossing of warn_days,
+// re-alert on each crossing of {warn_days, 30, 14, 7, 3, 1, 0}-day boundaries.
+function shouldAlertDomainExpiry(site, domainInfo) {
+  if (!domainInfo || domainInfo.days_remaining == null) return false;
+  const warnDays = site.domain_expiry_warn_days == null ? 30 : Number(site.domain_expiry_warn_days);
+  const days = Number(domainInfo.days_remaining);
+  if (warnDays <= 0) return false;
+  if (days > warnDays) return false;
+  const lastAlertedDays = site.domain_alerted_at_days == null ? null : Number(site.domain_alerted_at_days);
+  if (lastAlertedDays == null) return true;
+  const bands = [warnDays, 30, 14, 7, 3, 1, 0];
+  for (const band of bands) {
+    if (band <= warnDays && days <= band && lastAlertedDays > band) return true;
+  }
+  return false;
+}
+
+async function markDomainAlerted(site, days) {
+  await db.query(
+    `UPDATE sites SET domain_alerted_at_days = ? WHERE id = ?`,
+    [days, site.id]
+  );
+}
+
 async function processResult(site, result) {
   const s = getState(site.id);
 
@@ -179,6 +221,17 @@ async function processResult(site, result) {
       logger.warn({ siteId: site.id, days: result.cert.days_remaining }, 'monitor.cert_expiring_alert');
       await notifier.notifyCertExpiring(site, result.cert);
       await markCertAlerted(site, result.cert.days_remaining);
+    }
+  }
+
+  // Domain side-channel — only for monitor_type=domain. Same alert-band
+  // semantics as cert: fire once per crossing, never spam.
+  if (result.domain) {
+    await persistDomainInfo(site, result.domain);
+    if (shouldAlertDomainExpiry(site, result.domain)) {
+      logger.warn({ siteId: site.id, days: result.domain.days_remaining }, 'monitor.domain_expiring_alert');
+      await notifier.notifyDomainExpiring(site, result.domain);
+      await markDomainAlerted(site, result.domain.days_remaining);
     }
   }
 

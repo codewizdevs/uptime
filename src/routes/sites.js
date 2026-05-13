@@ -19,7 +19,13 @@ const grants = require('../lib/grants');
 const router = express.Router();
 router.param('id', idParam);
 
-const VALID_MONITOR_TYPES = ['active', 'heartbeat', 'cert', 'tcp', 'ping', 'dns'];
+const VALID_MONITOR_TYPES = ['active', 'heartbeat', 'cert', 'tcp', 'ping', 'dns', 'domain'];
+
+// Domain WHOIS/RDAP probes shouldn't hit registries more often than ~daily.
+// Registries rate-limit aggressively (some at 1/10s/IP) and expiry data
+// changes once per year. We clamp at 12h regardless of what the form sent.
+const DOMAIN_MIN_INTERVAL_SECONDS = 12 * 60 * 60;
+const DOMAIN_DEFAULT_INTERVAL_SECONDS = 24 * 60 * 60;
 const VALID_CHECK_TYPES = ['status', 'string', 'regex', 'json'];
 const VALID_METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'];
 const VALID_DNS_TYPES = ['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'SRV', 'CAA', 'SOA', 'PTR'];
@@ -49,7 +55,21 @@ function buildPayload(body) {
   const method = VALID_METHODS.includes(rawMethod) ? rawMethod : 'GET';
   const check_type = VALID_CHECK_TYPES.includes(body.check_type) ? body.check_type : 'status';
 
-  const enforced_interval = monitor_type === 'active' && cloudflare_mode ? Math.max(60, interval_seconds) : interval_seconds;
+  // Per-type interval floors. Domain probes are clamped to 12h regardless of
+  // what the form sends — registries throttle harder than that and expiry
+  // dates change once a year.
+  let enforced_interval;
+  if (monitor_type === 'domain') {
+    const raw = parseInt(body.interval_seconds, 10);
+    enforced_interval = Math.max(
+      DOMAIN_MIN_INTERVAL_SECONDS,
+      Number.isFinite(raw) && raw > 0 ? raw : DOMAIN_DEFAULT_INTERVAL_SECONDS
+    );
+  } else if (monitor_type === 'active' && cloudflare_mode) {
+    enforced_interval = Math.max(60, interval_seconds);
+  } else {
+    enforced_interval = interval_seconds;
+  }
 
   const display_name = (body.display_name || '').trim().slice(0, 255) || null;
   const status_page_group = (body.status_page_group || '').trim().slice(0, 120) || null;
@@ -75,6 +95,21 @@ function buildPayload(body) {
     : null;
   const dns_resolver = monitor_type === 'dns' ? (body.dns_resolver || '').trim().slice(0, 255) || null : null;
   const dns_expected = monitor_type === 'dns' ? (body.dns_expected || '').slice(0, 1024) || null : null;
+
+  // Domain (WHOIS/RDAP) fields. Strip schemes / paths / www. defensively
+  // so users can paste a URL and still get a usable apex domain.
+  const whois_domain = monitor_type === 'domain'
+    ? String(body.whois_domain || '').trim().toLowerCase()
+        .replace(/^https?:\/\//, '')
+        .replace(/\/.*$/, '')
+        .replace(/:\d+$/, '')
+        .replace(/^www\./, '')
+        .slice(0, 255) || null
+    : null;
+  const domain_expiry_warn_days_raw = parseInt(body.domain_expiry_warn_days, 10);
+  const domain_expiry_warn_days = Number.isFinite(domain_expiry_warn_days_raw)
+    ? Math.max(0, Math.min(365, domain_expiry_warn_days_raw))
+    : 30;
 
   // Phase 10 — per-monitor probe options (active monitors only).
   const VALID_BODY_TYPES = ['text', 'json', 'form'];
@@ -154,6 +189,8 @@ function buildPayload(body) {
     dns_record_type,
     dns_resolver,
     dns_expected,
+    whois_domain,
+    domain_expiry_warn_days,
     heartbeat_schedule_kind,
     heartbeat_cron,
     heartbeat_timezone,
@@ -439,12 +476,13 @@ router.post('/sites', acl.requireRole('admin', 'editor'), async (req, res, next)
           cert_expiry_warn_days, cert_host, cert_port,
           tcp_host, tcp_port, ping_host, ping_count,
           dns_query, dns_record_type, dns_resolver, dns_expected,
+          whois_domain, domain_expiry_warn_days,
           heartbeat_schedule_kind, heartbeat_cron, heartbeat_timezone,
           request_body, request_body_type,
           auth_type, auth_username, auth_password, auth_token,
           follow_redirects, skip_tls_verify, max_response_time_ms,
           notes, mute_notifications, owner_user_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         data.name, data.url, data.monitor_type, data.method, data.interval_seconds, data.timeout_ms,
         data.check_type, data.expected_status, data.expected_string, data.json_path, data.expected_json_value,
@@ -455,6 +493,7 @@ router.post('/sites', acl.requireRole('admin', 'editor'), async (req, res, next)
         data.cert_expiry_warn_days, data.cert_host, data.cert_port,
         data.tcp_host, data.tcp_port, data.ping_host, data.ping_count,
         data.dns_query, data.dns_record_type, data.dns_resolver, data.dns_expected,
+        data.whois_domain, data.domain_expiry_warn_days,
         data.heartbeat_schedule_kind, data.heartbeat_cron, data.heartbeat_timezone,
         data.request_body, data.request_body_type,
         data.auth_type, data.auth_username, data.auth_password, data.auth_token,
@@ -600,6 +639,7 @@ router.post('/sites/:id/edit', acl.requireSiteManage, async (req, res, next) => 
          cert_expiry_warn_days=?, cert_host=?, cert_port=?,
          tcp_host=?, tcp_port=?, ping_host=?, ping_count=?,
          dns_query=?, dns_record_type=?, dns_resolver=?, dns_expected=?,
+         whois_domain=?, domain_expiry_warn_days=?,
          heartbeat_schedule_kind=?, heartbeat_cron=?, heartbeat_timezone=?,
          request_body=?, request_body_type=?,
          auth_type=?, auth_username=?, auth_password=?, auth_token=?,
@@ -616,6 +656,7 @@ router.post('/sites/:id/edit', acl.requireSiteManage, async (req, res, next) => 
         data.cert_expiry_warn_days, data.cert_host, data.cert_port,
         data.tcp_host, data.tcp_port, data.ping_host, data.ping_count,
         data.dns_query, data.dns_record_type, data.dns_resolver, data.dns_expected,
+        data.whois_domain, data.domain_expiry_warn_days,
         data.heartbeat_schedule_kind, data.heartbeat_cron, data.heartbeat_timezone,
         data.request_body, data.request_body_type,
         data.auth_type, data.auth_username, data.auth_password, data.auth_token,
@@ -624,6 +665,13 @@ router.post('/sites/:id/edit', acl.requireSiteManage, async (req, res, next) => 
         id,
       ]
     );
+
+    // Clear the domain-alerted band whenever the user changes the warn-days
+    // threshold or moves to a different domain — otherwise tightening the
+    // threshold or pointing at a new domain would suppress the first alert.
+    if (data.monitor_type === 'domain') {
+      await db.query(`UPDATE sites SET domain_alerted_at_days = NULL WHERE id = ?`, [id]);
+    }
     // Owner reassignment is admin-only; viewers/editors can't change ownership
     // even when granted manage on the monitor.
     if (acl.isAdmin(req.session.user) && Object.prototype.hasOwnProperty.call(req.body, 'owner_user_id')) {

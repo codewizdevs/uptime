@@ -51,4 +51,14 @@ async function notifyCertExpiring(site, certInfo) {
   });
 }
 
-module.exports = { notifyDown, notifyRecovered, notifyChallenged, notifyCertExpiring, formatDuration };
+async function notifyDomainExpiring(site, domainInfo) {
+  await fire(site, 'domain_expiring', {
+    domain: domainInfo.domain,
+    domain_days_remaining: domainInfo.days_remaining,
+    domain_expires_at: domainInfo.expires_at,
+    domain_registrar: domainInfo.registrar,
+    domain_status: domainInfo.status,
+  });
+}
+
+module.exports = { notifyDown, notifyRecovered, notifyChallenged, notifyCertExpiring, notifyDomainExpiring, formatDuration };
