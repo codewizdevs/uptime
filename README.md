@@ -200,7 +200,7 @@ If you want a **lightweight self-hosted Uptime Kuma alternative** that you can `
 - Bearer-token authenticated REST under `/api/v1/` with `read` / `write` scopes (admins create them at `/settings/api-tokens`; users mint personal ones at `/settings/account`).
 - Endpoints: `health`, `sites`, `sites/:id`, `sites/:id/checks`, `sites/:id/incidents`, `incidents`, `tags`, `stats`, plus `pause` / `resume` / `check-now` / `DELETE` on a site.
 - Every `/api/v1` response is filtered through the token owner's ACL, so non-admins can only see / act on monitors they have access to.
-- **Prometheus exporter** at `/metrics` — series for `uptime_monitor_up`, `uptime_monitor_response_time_ms`, `uptime_monitor_last_check_age_seconds`, `uptime_monitor_uptime_pct_24h`, `uptime_cert_days_remaining`, `uptime_monitors_total{state}`, `uptime_open_incidents`. Public until the first API token is created; token-gated thereafter and ACL-filtered.
+- **Prometheus exporter** at `/metrics` — series for `uptime_monitor_up`, `uptime_monitor_response_time_ms`, `uptime_monitor_last_check_age_seconds`, `uptime_monitor_uptime_pct_24h`, `uptime_cert_days_remaining`, `uptime_domain_days_remaining` (registered-domain WHOIS / RDAP expiry, emitted for `domain` monitors), `uptime_monitors_total{state}`, `uptime_open_incidents`. Public until the first API token is created; token-gated thereafter and ACL-filtered.
 - Tokens stored as SHA-256 with last-used timestamp tracked; the plaintext token is shown exactly once at creation.
 
 ### Settings

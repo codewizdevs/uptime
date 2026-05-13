@@ -127,9 +127,23 @@ function siteToApi(s) {
     cert_host: s.cert_host || null,
     cert_port: s.cert_port || null,
     cert_expiry_warn_days: s.cert_expiry_warn_days || null,
+    whois_domain: s.whois_domain || null,
+    domain_expiry_warn_days: s.domain_expiry_warn_days || null,
+    domain_expires_at: s.domain_expires_at || null,
+    domain_registrar: s.domain_registrar || null,
+    domain_status: s.domain_status || null,
+    domain_last_checked_at: s.domain_last_checked_at || null,
+    domain_days_remaining: computeDomainDays(s.domain_expires_at),
     created_at: s.created_at,
     updated_at: s.updated_at,
   };
+}
+
+function computeDomainDays(expiresAt) {
+  if (!expiresAt) return null;
+  const t = Date.parse(expiresAt);
+  if (!Number.isFinite(t)) return null;
+  return Math.floor((t - Date.now()) / 86400000);
 }
 
 // ─── READ endpoints ──────────────────────────────────────────────────────
@@ -341,6 +355,8 @@ router.get('/metrics', async (req, res, next) => {
     lines.push('# TYPE uptime_monitor_uptime_pct_24h gauge');
     lines.push('# HELP uptime_cert_days_remaining TLS certificate days until expiry.');
     lines.push('# TYPE uptime_cert_days_remaining gauge');
+    lines.push('# HELP uptime_domain_days_remaining Registered domain days until expiry (WHOIS / RDAP).');
+    lines.push('# TYPE uptime_domain_days_remaining gauge');
     lines.push('# HELP uptime_monitors_total Total monitor count by state.');
     lines.push('# TYPE uptime_monitors_total gauge');
     lines.push('# HELP uptime_open_incidents Currently open incidents.');
@@ -367,6 +383,13 @@ router.get('/metrics', async (req, res, next) => {
       if (pct != null) lines.push(`uptime_monitor_uptime_pct_24h{${labels}} ${pct.toFixed(4)}`);
       if (s.last_cert_days_remaining != null) {
         lines.push(`uptime_cert_days_remaining{${labels}} ${s.last_cert_days_remaining}`);
+      }
+      if (s.monitor_type === 'domain' && s.domain_expires_at) {
+        const t = Date.parse(s.domain_expires_at);
+        if (Number.isFinite(t)) {
+          const days = Math.floor((t - now) / 86400000);
+          lines.push(`uptime_domain_days_remaining{${labels}} ${days}`);
+        }
       }
     }
     lines.push(`uptime_monitors_total{state="up"} ${countUp}`);
