@@ -6,20 +6,20 @@
   <meta name="referrer" content="no-referrer">
   <title>Uptime — self-hosted open-source uptime monitor in Node.js</title>
 
-  <meta name="description" content="Self-hosted, MIT-licensed uptime monitor in Node.js with HTTP, TCP, ping, DNS, TLS cert, and heartbeat probes. 10 notification channels, public status page, multi-user ACLs, REST API, and Prometheus exporter. A lightweight alternative to Uptime Kuma, Healthchecks.io, Gatus, Statping, and Better Stack.">
-  <meta name="keywords" content="uptime monitor, self-hosted uptime monitor, open source uptime monitor, Uptime Kuma alternative, Healthchecks.io alternative, Gatus alternative, Statping alternative, Better Stack alternative, Node.js uptime monitor, SQLite uptime monitor, MySQL uptime monitor, website monitor, HTTP monitor, TLS certificate monitor, SSL expiry monitor, heartbeat monitor, cron monitor, Cloudflare-aware monitoring, Discord uptime notifications, Slack uptime alerts, Prometheus uptime exporter, public status page">
+  <meta name="description" content="Self-hosted, MIT-licensed uptime monitor in Node.js with HTTP, TCP, ping, DNS, TLS cert, domain WHOIS / RDAP expiry, and heartbeat probes. 10 notification channels, public status page, multi-user ACLs, REST API, and Prometheus exporter. A lightweight alternative to Uptime Kuma, Healthchecks.io, Gatus, Statping, and Better Stack.">
+  <meta name="keywords" content="uptime monitor, self-hosted uptime monitor, open source uptime monitor, Uptime Kuma alternative, Healthchecks.io alternative, Gatus alternative, Statping alternative, Better Stack alternative, Node.js uptime monitor, SQLite uptime monitor, MySQL uptime monitor, website monitor, HTTP monitor, TLS certificate monitor, SSL expiry monitor, domain expiry monitor, WHOIS monitor, RDAP monitor, domain renewal alert, heartbeat monitor, cron monitor, Cloudflare-aware monitoring, Discord uptime notifications, Slack uptime alerts, Prometheus uptime exporter, public status page">
   <meta name="author" content="CodeWiz">
   <meta name="theme-color" content="#0f1722">
 
   <meta property="og:type" content="website">
   <meta property="og:title" content="Uptime — self-hosted open-source uptime monitor in Node.js">
-  <meta property="og:description" content="A lightweight, MIT-licensed, single-process uptime monitor. HTTP / TCP / ping / DNS / TLS / heartbeat probes, 10 notification channels, status page, multi-user ACLs, REST API, Prometheus exporter. No Docker required.">
+  <meta property="og:description" content="A lightweight, MIT-licensed, single-process uptime monitor. HTTP / TCP / ping / DNS / TLS / domain WHOIS / heartbeat probes, 10 notification channels, status page, multi-user ACLs, REST API, Prometheus exporter. No Docker required.">
   <meta property="og:image" content="screenshots/dashboard.png">
   <meta property="og:url" content="https://codewizdevs.github.io/uptime/">
 
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Uptime — self-hosted open-source uptime monitor">
-  <meta name="twitter:description" content="HTTP / TCP / ping / DNS / TLS / heartbeat probes. 10 notification channels. Public status page. Multi-user ACLs. Prometheus exporter. MIT-licensed. No Docker required.">
+  <meta name="twitter:description" content="HTTP / TCP / ping / DNS / TLS / domain WHOIS / heartbeat probes. 10 notification channels. Public status page. Multi-user ACLs. Prometheus exporter. MIT-licensed. No Docker required.">
   <meta name="twitter:image" content="screenshots/dashboard.png">
 
   <link rel="icon" type="image/svg+xml" href="logo.svg">
@@ -58,7 +58,7 @@
       <span class="badge-pill">MIT-licensed · No Docker required</span>
       <h1>Self-hosted uptime monitor<br>built for small teams.</h1>
       <p class="lead">
-        One Express + EJS app, SQLite (or MySQL), zero build step. Monitor HTTP, TCP, ICMP, DNS, TLS certificates, and passive heartbeats. Alert through 10 channels. Share monitors with per-monitor ACLs. <strong>A lightweight alternative to Uptime Kuma, Healthchecks.io, Gatus, Statping, and Better Stack.</strong>
+        One Express + EJS app, SQLite (or MySQL), zero build step. Monitor HTTP, TCP, ICMP, DNS, TLS certificates, <strong>domain WHOIS / RDAP expiry</strong>, and passive heartbeats. Alert through 10 channels. Share monitors with per-monitor ACLs. <strong>A lightweight alternative to Uptime Kuma, Healthchecks.io, Gatus, Statping, and Better Stack.</strong>
       </p>
       <div class="hero-ctas">
         <a class="btn btn-primary" href="https://github.com/codewizdevs/uptime" target="_blank" rel="noopener">
@@ -88,7 +88,7 @@
       <div class="kpi-label">notification channels</div>
     </div>
     <div>
-      <div class="kpi">6</div>
+      <div class="kpi">7</div>
       <div class="kpi-label">monitor types</div>
     </div>
     <div>
@@ -120,8 +120,8 @@
         <div class="feature-icon icon-blue">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 10v6m11-11h-6M7 12H1m17.07-7.07l-4.24 4.24M9.17 14.83l-4.24 4.24m0-14.14l4.24 4.24m5.66 5.66l4.24 4.24"/></svg>
         </div>
-        <h3>6 monitor types</h3>
-        <p>HTTP / HTTPS with regex, JSON-path, body-string, and status-code assertions. TCP, ICMP ping, DNS records, TLS cert expiry, and passive heartbeats (Healthchecks.io-style with start / success / fail pings and cron schedules).</p>
+        <h3>7 monitor types</h3>
+        <p>HTTP / HTTPS with regex, JSON-path, body-string, and status-code assertions. TCP, ICMP ping, DNS records, TLS cert expiry, <strong>domain WHOIS / RDAP expiry</strong>, and passive heartbeats (Healthchecks.io-style with start / success / fail pings and cron schedules).</p>
       </article>
 
       <article class="feature">
@@ -212,6 +212,10 @@
       <div class="unique-card">
         <h3><span class="num">06</span> Single-process, Docker-optional, SQLite default</h3>
         <p>Clone, <code>npm install</code>, <code>npm start</code>. That's the prerequisite list. Docker is available if you want it; nothing about the project assumes it.</p>
+      </div>
+      <div class="unique-card">
+        <h3><span class="num">07</span> Domain WHOIS / RDAP expiry as a first-class monitor</h3>
+        <p>Catch a forgotten registrar renewal <em>before</em> the domain falls off the internet. The probe queries <a href="https://www.rfc-editor.org/rfc/rfc7480" target="_blank" rel="noopener">RDAP</a> first via the IANA bootstrap registry (structured JSON), falls back to WHOIS over TCP/43 with multi-pattern parsing, stores <code>expires_at</code> / <code>registrar</code> / EPP <code>status</code>, and fires <code>domain_expiring</code> at 30/14/7/3/1/0-day bands — no nagging. Returns <em>unknown</em> for redacted TLDs instead of false-flagging DOWN. Uptime Kuma, Gatus, Statping, and Healthchecks all skip this.</p>
       </div>
     </div>
   </div>
@@ -310,6 +314,7 @@
           <tr><th>Self-hosted</th>         <td class="us">Yes</td>      <td>Yes</td>       <td>Yes</td>        <td>Yes</td>     <td>Yes</td>     <td>No (SaaS)</td></tr>
           <tr><th>Runs without Docker</th> <td class="us yes">Yes (1 process)</td> <td>Yes</td> <td>Yes</td>   <td>Yes</td>     <td>Yes</td>     <td>—</td></tr>
           <tr><th>HTTP / TCP / Ping / DNS / Cert</th>          <td class="us yes">All five</td> <td>Most</td>   <td>HTTP only (passive)</td> <td>Most</td><td>HTTP / TCP</td><td>All five</td></tr>
+          <tr><th>Domain WHOIS / RDAP expiry</th>              <td class="us yes">Dedicated type (RDAP→WHOIS)</td><td>No</td><td>No</td>     <td>No</td>  <td>No</td>      <td>Basic</td></tr>
           <tr><th>Heartbeats with cron + body capture</th>     <td class="us yes">Yes</td>    <td>Basic</td>     <td>Best in class</td>      <td>No</td>  <td>No</td>      <td>Yes</td></tr>
           <tr><th>Cloudflare-aware probing</th>                <td class="us yes">Yes</td>    <td>No</td>        <td>No</td>                 <td>No</td>  <td>No</td>      <td>—</td></tr>
           <tr><th>Notification channels</th>                   <td class="us">10</td>        <td>90+</td>       <td>30+</td>                <td>Via shoutrrr</td><td>13</td><td>20+</td></tr>
