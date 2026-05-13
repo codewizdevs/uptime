@@ -2,7 +2,7 @@
 
 A free, MIT-licensed, **self-hosted uptime monitor** written in Node.js. One Express + EJS app, SQLite (or MySQL), no Docker required (Docker is available if you want it). Built as a simple alternative to Uptime Kuma, Healthchecks.io, Gatus, Statping, and Better Stack.
 
-**Monitor anything**: HTTP/HTTPS endpoints, TCP ports, ICMP ping, DNS records, TLS certificate expiry, **passive heartbeats** for cron jobs and background workers (Healthchecks.io-style with `start`/`success`/`fail` pings, exit codes, cron schedules).
+**Monitor anything**: HTTP/HTTPS endpoints, TCP ports, ICMP ping, DNS records, TLS certificate expiry, **domain WHOIS / RDAP expiry** (catch a forgotten registrar renewal _before_ the domain falls off the internet), **passive heartbeats** for cron jobs and background workers (Healthchecks.io-style with `start`/`success`/`fail` pings, exit codes, cron schedules).
 
 **Notify everywhere**: Discord, Slack, Telegram, Ntfy.sh, Gotify, Pushover, Mattermost, Microsoft Teams, generic webhooks, SMTP email — with fully customizable per-event templates and `{{placeholders}}`.
 
@@ -20,7 +20,7 @@ If you want a **lightweight self-hosted Uptime Kuma alternative** that you can `
 
 ![Self-hosted uptime monitor dashboard with monitor cards and dark mode](docs/screenshots/dashboard.png)
 
-**Filter, search, organise** — filter by state (up / down / unknown / paused), monitor type (HTTP / heartbeat / TCP / ping / DNS / cert), Cloudflare mode, and coloured tags. Every URL parameter is preserved through pagination and bulk actions.
+**Filter, search, organise** — filter by state (up / down / unknown / paused), monitor type (HTTP / heartbeat / TCP / ping / DNS / cert / domain), Cloudflare mode, and coloured tags. Every URL parameter is preserved through pagination and bulk actions.
 
 ![Uptime monitor dashboard filters by state, type, Cloudflare mode and tag](docs/screenshots/dashboard-filters.png)
 
@@ -28,7 +28,7 @@ If you want a **lightweight self-hosted Uptime Kuma alternative** that you can `
 
 ![Bulk pause, resume, delete and tag actions across many monitors](docs/screenshots/dashboard-bulk-actions.png)
 
-**Add a monitor** — HTTP / TCP / ping / DNS / cert / heartbeat in one form. Status / body-string / JSON-path / regex assertions, optional response-time threshold, per-monitor failure threshold, Cloudflare-aware mode, custom headers, tags, channels, and (for admins) per-monitor ownership.
+**Add a monitor** — HTTP / TCP / ping / DNS / cert / domain / heartbeat in one form. Status / body-string / JSON-path / regex assertions, optional response-time threshold, per-monitor failure threshold, Cloudflare-aware mode, custom headers, tags, channels, and (for admins) per-monitor ownership.
 
 ![New monitor form with assertions, headers, tags and channel selection](docs/screenshots/monitor-form.png)
 
@@ -48,7 +48,7 @@ If you want a **lightweight self-hosted Uptime Kuma alternative** that you can `
 
 ![Notification channels list: Discord, Slack, Telegram, Ntfy, Gotify, Pushover, Mattermost, Teams, email, webhook](docs/screenshots/channels.png)
 
-**Customizable templates** — every event (DOWN / RECOVERED / CHALLENGED / CERT_EXPIRING / TEST) has its own title and body with `{{placeholders}}` like `{{site_name}}`, `{{site_url}}`, `{{error}}`, `{{status_code}}`, `{{duration_human}}`, `{{cert_days_remaining}}`. Click a placeholder to insert it at the cursor, click "reset to default" to start over.
+**Customizable templates** — every event (DOWN / RECOVERED / CHALLENGED / CERT_EXPIRING / DOMAIN_EXPIRING / TEST) has its own title and body with `{{placeholders}}` like `{{site_name}}`, `{{site_url}}`, `{{error}}`, `{{status_code}}`, `{{duration_human}}`, `{{cert_days_remaining}}`, `{{domain}}`, `{{domain_days_remaining}}`, `{{domain_registrar}}`. Click a placeholder to insert it at the cursor, click "reset to default" to start over.
 
 ![Notification message templates with placeholder palette](docs/screenshots/channel-templates.png)
 
@@ -89,6 +89,7 @@ If you want a **lightweight self-hosted Uptime Kuma alternative** that you can `
 | **HTTP / HTTPS probes**      | Yes                   | Yes             | No (passive only)| Yes             | Yes            | Yes             | Yes             |
 | **TCP / Ping / DNS probes**  | Yes                   | Yes             | No               | Yes             | TCP only       | Yes             | Yes             |
 | **TLS cert expiry monitor**  | Yes (dedicated type)  | Yes             | No               | Yes             | No             | Yes             | Yes             |
+| **Domain WHOIS / RDAP expiry monitor** | **Yes (dedicated type, RDAP → WHOIS fallback, IANA bootstrap)** | No | No | No | No | Yes (basic) | No |
 | **Passive heartbeats (cron)**| Yes (start/success/fail + cron schedule + body capture) | Yes (basic) | **Yes (best in class)** | No | No | Yes | Yes |
 | **Cloudflare-aware probing** | **Yes (UA rotation, challenge detection, adaptive backoff)** | No | No | No | No | — | No |
 | **Status assertions**        | Status / body-string / JSON path / regex / response-time | Status / keyword | Pass/fail token | YAML conditions | Status / contains | Status / keyword | Status |
@@ -122,6 +123,7 @@ If you want a **lightweight self-hosted Uptime Kuma alternative** that you can `
 - **Ping (ICMP)** — shells out to the system `ping` (no `CAP_NET_RAW` needed unless containerised); reports avg RTT and partial-loss as failure.
 - **DNS** — A / AAAA / CNAME / MX / TXT / NS / SRV / CAA / SOA / PTR via `dns.promises.Resolver` with optional custom resolver and substring / `/regex/` expected-value match.
 - **Certificate** — TLS-handshake-only monitor, works for non-443 ports (SMTPS, IMAPS, custom). Tracks days-remaining and fires `cert_expiring` at a per-monitor threshold (default 14 days).
+- **Domain (WHOIS / RDAP expiry)** — track the registration expiry of the domain itself, not the TLS cert. The probe tries [RDAP](https://www.rfc-editor.org/rfc/rfc7480) first using the IANA RDAP bootstrap registry (structured JSON, parsed reliably) and falls back to WHOIS over TCP/43 with multi-pattern parsing for diverse registry formats. Stores `expires_at`, `registrar`, EPP `status`, and `days_remaining`. Fires `domain_expiring` at a per-monitor warn-band (default 30 days), with anti-spam bands at 30 / 14 / 7 / 3 / 1 / 0 days so you don't get nagged hourly. Lookups run at most every 12h (server-clamped) and gracefully report `unknown` for redacted / public-suffix domains instead of false-flagging them DOWN. Input is normalised — paste `https://www.example.com/path` and it stores `example.com`.
 - **Passive heartbeat (Healthchecks.io-style)** — each monitor has a unique token with four endpoints: `/ping/<token>`, `/ping/<token>/start`, `/ping/<token>/0`, `/ping/<token>/<non-zero>`. Bodies up to 4 KB are captured; exit code and duration are computed across `start`/`success` pairs. Schedules can be **interval+grace** _or_ **cron** in a chosen timezone.
 
 ### Assertions (HTTP monitors)
@@ -151,14 +153,14 @@ If you want a **lightweight self-hosted Uptime Kuma alternative** that you can `
 ### Notifications
 - **Multi-channel fan-out** — attach any number of channels per monitor. Each channel is independently configured.
 - **10 channel types**: Discord (rich embeds), Slack, Telegram, Ntfy.sh, Gotify, Pushover, Mattermost, Microsoft Teams (adaptive cards), Email (SMTP), Generic webhook.
-- **Custom message templates per event** — DOWN / RECOVERED / CHALLENGED / CERT_EXPIRING / TEST each have their own title and body with `{{placeholders}}` like `{{site_name}}`, `{{site_url}}`, `{{error}}`, `{{status_code}}`, `{{duration_human}}`, `{{cert_days_remaining}}`, `{{timestamp}}`. One-click reset-to-default per template.
+- **Custom message templates per event** — DOWN / RECOVERED / CHALLENGED / CERT_EXPIRING / DOMAIN_EXPIRING / TEST each have their own title and body with `{{placeholders}}` like `{{site_name}}`, `{{site_url}}`, `{{error}}`, `{{status_code}}`, `{{duration_human}}`, `{{cert_days_remaining}}`, `{{domain}}`, `{{domain_days_remaining}}`, `{{domain_expires_at}}`, `{{domain_registrar}}`, `{{timestamp}}`. One-click reset-to-default per template.
 - **Maintenance windows** suppress alerts globally or per monitor on a cron schedule or one-off range — events still log as `suppressed_by_maintenance`.
 - **Test send** button on every channel for instant verification.
 - `APP_DEBUG=true` switches every channel into dry-run mode — the would-be payload is logged instead of sent.
 
 ### Dashboard & UI
 - Tabler-themed dashboard, **dark mode by default** with one-click light/dark toggle.
-- Compact monitor cards with status stripe, animated dot, 24h uptime %, last response time, last-checked relative time, **tag chips**, cert-expiry pill on HTTPS monitors. 52 per page with server-side pagination.
+- Compact monitor cards with status stripe, animated dot, 24h uptime %, last response time, last-checked relative time, **tag chips**, cert-expiry pill on HTTPS monitors, domain-expiry pill on `domain` monitors. 52 per page with server-side pagination.
 - **Filter & search bar**: by name/URL, by state (up/down/unknown/paused), by monitor type, by Cloudflare mode, by tag.
 - **Bulk actions** — toggle select-mode for per-card checkboxes + a sticky bottom bar to pause / resume / delete / add-tag / remove-tag in one shot.
 - **Live updating** — the dashboard polls only the visible monitors every 5s and updates state, response time, and last-checked in place.
@@ -436,6 +438,7 @@ src/
     checker.js           HTTP probe + brotli/gzip decode + assertions
     cert.js              TLS handshake cert inspection
     tcp.js / ping.js / dnscheck.js   non-HTTP monitor types
+    whois.js             RDAP (with IANA bootstrap) + WHOIS-over-TCP/43 domain probe
     cloudflare.js        challenge detection, UA pool, jitter
     channels.js          channel data model, dispatch, templates
     templates.js         {{placeholder}} renderer
@@ -473,13 +476,13 @@ PLAN.md                  feature roadmap with shipped/deferred per phase
 
 ## Keywords
 
-self-hosted uptime monitor, open source uptime monitor, Uptime Kuma alternative, Healthchecks.io alternative, Gatus alternative, Statping alternative, Better Stack alternative, Node.js uptime monitor, Express uptime monitor, SQLite uptime monitor, MySQL uptime monitor, free uptime monitor, MIT uptime monitor, website monitor, HTTP monitor, TCP monitor, ICMP ping monitor, DNS monitor, TLS certificate monitor, SSL expiry monitor, cron monitor, heartbeat monitor, Healthchecks.io self-hosted, Discord notifications, Slack notifications, Telegram notifications, Ntfy notifications, Gotify notifications, Pushover notifications, Mattermost notifications, Microsoft Teams notifications, generic webhook notifications, Prometheus uptime exporter, Grafana uptime dashboard, Cloudflare-aware monitoring, public status page, RSS status feed, maintenance windows, REST API uptime, audit log, TOTP 2FA, per-monitor ACL, multi-user uptime monitor, role-based access control, PM2 nginx deployment.
+self-hosted uptime monitor, open source uptime monitor, Uptime Kuma alternative, Healthchecks.io alternative, Gatus alternative, Statping alternative, Better Stack alternative, Node.js uptime monitor, Express uptime monitor, SQLite uptime monitor, MySQL uptime monitor, free uptime monitor, MIT uptime monitor, website monitor, HTTP monitor, TCP monitor, ICMP ping monitor, DNS monitor, TLS certificate monitor, SSL expiry monitor, domain expiry monitor, WHOIS monitor, RDAP monitor, domain renewal alert, cron monitor, heartbeat monitor, Healthchecks.io self-hosted, Discord notifications, Slack notifications, Telegram notifications, Ntfy notifications, Gotify notifications, Pushover notifications, Mattermost notifications, Microsoft Teams notifications, generic webhook notifications, Prometheus uptime exporter, Grafana uptime dashboard, Cloudflare-aware monitoring, public status page, RSS status feed, maintenance windows, REST API uptime, audit log, TOTP 2FA, per-monitor ACL, multi-user uptime monitor, role-based access control, PM2 nginx deployment.
 
 ---
 
 ## Roadmap & welcomed PRs
 
-A detailed phase-by-phase changelog of what's shipped (Phase 1 through 13) lives in [`PLAN.md`](./PLAN.md). Forward-looking ideas, all explicitly out of scope for v1 but on the table as opt-in plugins:
+A detailed phase-by-phase changelog of what's shipped lives in [`PLAN.md`](./PLAN.md) — phases 1–13 plus the post-v1 increments (Cloudflare-aware probing hardening, domain WHOIS/RDAP expiry tracking). Forward-looking ideas, all explicitly out of scope for v1 but on the table as opt-in plugins:
 
 - [ ] Multi-region probe fleet (worker mode)
 - [ ] On-call schedules and phone-call escalation
