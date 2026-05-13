@@ -16,7 +16,7 @@ If you want a **lightweight self-hosted Uptime Kuma alternative** that you can `
 
 ## Screenshots
 
-**Live dashboard** — compact monitor cards, animated state stripes, live polling every 5s, dark mode by default, full-text search, server-side pagination (52 per page), cert-expiry pill on HTTPS monitors, hover-to-delete inline action.
+**Live dashboard** — compact monitor cards, animated state stripes, live polling every 5s, dark mode by default, full-text search, server-side pagination (50 per page) with **unhealthy monitors sorted first** so 1000-monitor instances still surface real issues on page 1, cert-expiry pill on HTTPS monitors, hover-to-delete inline action.
 
 ![Self-hosted uptime monitor dashboard with monitor cards and dark mode](docs/screenshots/dashboard.png)
 
@@ -160,7 +160,7 @@ If you want a **lightweight self-hosted Uptime Kuma alternative** that you can `
 
 ### Dashboard & UI
 - Tabler-themed dashboard, **dark mode by default** with one-click light/dark toggle.
-- Compact monitor cards with status stripe, animated dot, 24h uptime %, last response time, last-checked relative time, **tag chips**, cert-expiry pill on HTTPS monitors, domain-expiry pill on `domain` monitors. 52 per page with server-side pagination.
+- Compact monitor cards with status stripe, animated dot, 24h uptime %, last response time, last-checked relative time, **tag chips**, cert-expiry pill on HTTPS monitors, domain-expiry pill on `domain` monitors. **50 per page** with server-side pagination, **unhealthy monitors sorted first** (down → unknown → up → paused) so the worst issues always land on page 1 — comfortably handles 1000+ monitors without UI lag.
 - **Filter & search bar**: by name/URL, by state (up/down/unknown/paused), by monitor type, by Cloudflare mode, by tag.
 - **Bulk actions** — toggle select-mode for per-card checkboxes + a sticky bottom bar to pause / resume / delete / add-tag / remove-tag in one shot.
 - **Live updating** — the dashboard polls only the visible monitors every 5s and updates state, response time, and last-checked in place.

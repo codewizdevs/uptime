@@ -220,7 +220,26 @@ function pickTagIds(body) {
   return raw.map((v) => parseInt(v, 10)).filter((n) => Number.isFinite(n) && n > 0);
 }
 
-const PAGE_SIZE = 52;
+const PAGE_SIZE = 50;
+
+// Listing order prioritises unhealthy monitors so a site admin paging
+// through 1000+ monitors always sees actionable issues on page 1 first.
+// Portable between SQLite and MySQL: both support CASE in ORDER BY.
+//   1. down (and not paused)      → first
+//   2. unknown                    → second (may be transitioning to down)
+//   3. up                         → third
+//   4. anything else / null state → fourth
+//   5. paused                     → last (explicitly silenced)
+const SITE_HEALTH_ORDER_SQL = `
+  CASE
+    WHEN paused = 1 THEN 4
+    WHEN current_state = 'down' THEN 0
+    WHEN current_state = 'unknown' THEN 1
+    WHEN current_state = 'up' THEN 2
+    ELSE 3
+  END,
+  name ASC
+`.trim();
 const VALID_STATES = ['up', 'down', 'unknown', 'paused'];
 const VALID_TYPES = ['active', 'heartbeat', 'cert', 'tcp', 'ping', 'dns', 'domain'];
 
@@ -297,7 +316,7 @@ router.get('/', async (req, res, next) => {
     const offset = (page - 1) * PAGE_SIZE;
 
     const sites = await db.query(
-      `SELECT * FROM sites ${whereSql} ORDER BY name ASC LIMIT ${PAGE_SIZE} OFFSET ${offset}`,
+      `SELECT * FROM sites ${whereSql} ORDER BY ${SITE_HEALTH_ORDER_SQL} LIMIT ${PAGE_SIZE} OFFSET ${offset}`,
       params
     );
 
