@@ -649,9 +649,17 @@ async function dispatchToChannel(channel, event, vars, log) {
     const title = tpl.render(pickTemplate(channel, event, 'title'), vars);
     const body  = tpl.render(pickTemplate(channel, event, 'body'),  vars);
     const tags = (cfg.tags && cfg.tags.length) ? cfg.tags : NTFY_DEFAULT_TAGS[event] || [];
+    // ntfy supports unicode titles, but undici (and most strict HTTP clients)
+    // refuse to send non-ASCII bytes in header values per RFC 7230. RFC 2047
+    // encoded-words are universally understood by ntfy and survive the
+    // transport unchanged. Only encode when needed so plain ASCII titles
+    // remain human-readable on the wire.
+    const titleHeader = (title && /[^\x20-\x7e]/.test(title))
+      ? '=?UTF-8?B?' + Buffer.from(title, 'utf8').toString('base64') + '?='
+      : (title || undefined);
     const headers = {
       'Content-Type': 'text/plain; charset=utf-8',
-      'Title': title || undefined,
+      'Title': titleHeader,
       'Priority': String(cfg.priority || 3),
       'Tags': tags.length ? tags.join(',') : undefined,
       'Click': cfg.click_url || vars.site_url || undefined,

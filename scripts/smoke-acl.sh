@@ -134,10 +134,12 @@ ALICE_EXPORT=$(post_status "$TMP/alice.jar" /settings/backup/export "scope=all&i
 [[ "$ALICE_EXPORT" = "403" ]] || fail "alice POST /settings/backup/export should be 403 (got $ALICE_EXPORT)"
 pass "alice: admin pages 403, own account/audit 200, backup export blocked"
 
-# /api/sites: alice may see her own, not others.
+# /api/sites: alice may see her own, not others. Anchor patterns with a
+# trailing `,` so we don't get false hits when ids share a prefix
+# (eg. "id":7 matches "id":76 if we don't anchor).
 ALICE_API=$(curl -s -b "$TMP/alice.jar" -H "Accept: application/json" -H "X-Requested-With: XMLHttpRequest" "$BASE/api/sites?ids=$ALICE_SITE_ID,7,8")
-echo "$ALICE_API" | grep -q "\"id\":$ALICE_SITE_ID" || fail "alice should see her own in /api/sites"
-echo "$ALICE_API" | grep -q '"id":7' && fail "alice should NOT see site 7 before grant"
+echo "$ALICE_API" | grep -qE "\"id\":$ALICE_SITE_ID[,}]" || fail "alice should see her own in /api/sites"
+echo "$ALICE_API" | grep -qE '"id":7[,}]' && fail "alice should NOT see site 7 before grant"
 pass "alice /api/sites scoped to her own"
 
 # ── 4. grants ──────────────────────────────────────────────────────────
@@ -151,8 +153,8 @@ pass "grants set"
 # ── 5. alice ACL ───────────────────────────────────────────────────────
 info "5. alice sees own + 7, edits 7, cannot edit 8"
 ALICE_API2=$(curl -s -b "$TMP/alice.jar" -H "Accept: application/json" -H "X-Requested-With: XMLHttpRequest" "$BASE/api/sites?ids=$ALICE_SITE_ID,7,8")
-echo "$ALICE_API2" | grep -q '"id":7' || fail "alice should now see site 7"
-echo "$ALICE_API2" | grep -q '"id":8' && fail "alice should still NOT see site 8"
+echo "$ALICE_API2" | grep -qE '"id":7[,}]' || fail "alice should now see site 7"
+echo "$ALICE_API2" | grep -qE '"id":8[,}]' && fail "alice should still NOT see site 8"
 [[ "$(status "$TMP/alice.jar" /sites/7)"      = "200" ]] || fail "alice /sites/7 → not 200"
 [[ "$(status "$TMP/alice.jar" /sites/7/edit)" = "200" ]] || fail "alice /sites/7/edit → not 200"
 [[ "$(status "$TMP/alice.jar" /sites/8)"      = "403" ]] || fail "alice /sites/8 should be 403"
@@ -220,8 +222,8 @@ ALICE_TOKEN=$(node_run "(async()=>{
 })().catch(e=>{console.error(e);process.exit(1)})")
 ALICE_API_V1=$(curl -s -H "Authorization: Bearer $ALICE_TOKEN" "$BASE/api/v1/sites")
 echo "$ALICE_API_V1" | grep -q "\"id\":$ALICE_SITE_ID" || fail "alice token should expose her own site"
-echo "$ALICE_API_V1" | grep -q '"id":7' || fail "alice token should expose granted site 7"
-echo "$ALICE_API_V1" | grep -q '"id":8' && fail "alice token should NOT expose site 8"
+echo "$ALICE_API_V1" | grep -qE '"id":7[,}]' || fail "alice token should expose granted site 7"
+echo "$ALICE_API_V1" | grep -qE '"id":8[,}]' && fail "alice token should NOT expose site 8"
 ALICE_403=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $ALICE_TOKEN" "$BASE/api/v1/sites/8")
 [[ "$ALICE_403" = "403" ]] || fail "alice token GET /api/v1/sites/8 should be 403 (got $ALICE_403)"
 pass "alice API token ACL works"
