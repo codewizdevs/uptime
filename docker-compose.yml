@@ -38,6 +38,20 @@ services:
       APP_NAME: "${APP_NAME:-}"
       FOOTER_TEXT: "${FOOTER_TEXT:-}"
       FOOTER_LINK: "${FOOTER_LINK:-}"
+
+      # Optional OIDC single sign-on (PocketID, Authelia, Authentik, Keycloak…)
+      OIDC_ISSUER: "${OIDC_ISSUER:-}"
+      OIDC_CLIENT_ID: "${OIDC_CLIENT_ID:-}"
+      OIDC_CLIENT_SECRET: "${OIDC_CLIENT_SECRET:-}"
+      OIDC_SCOPES: "${OIDC_SCOPES:-openid profile email groups}"
+      OIDC_BUTTON_LABEL: "${OIDC_BUTTON_LABEL:-Sign in with SSO}"
+      OIDC_GROUPS_CLAIM: "${OIDC_GROUPS_CLAIM:-groups}"
+      OIDC_ADMIN_GROUP: "${OIDC_ADMIN_GROUP:-}"
+      OIDC_EDITOR_GROUP: "${OIDC_EDITOR_GROUP:-}"
+      OIDC_VIEWER_GROUP: "${OIDC_VIEWER_GROUP:-}"
+      OIDC_AUTO_CREATE: "${OIDC_AUTO_CREATE:-true}"
+      OIDC_DISABLE_PASSWORD_LOGIN: "${OIDC_DISABLE_PASSWORD_LOGIN:-false}"
+      OIDC_ALLOW_HTTP_ISSUER: "${OIDC_ALLOW_HTTP_ISSUER:-false}"
     volumes:
       - uptime-data:/data
       - uptime-logs:/app/logs

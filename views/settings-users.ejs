@@ -132,6 +132,11 @@
                           <% if (u.must_change_password) { %>
                             <span class="badge bg-yellow-lt ms-1" title="Forced password change on next login">pw reset</span>
                           <% } %>
+                          <% if (u.auth_source === 'oidc') { %>
+                            <span class="badge bg-azure-lt ms-1" title="Created by single sign-on; signs in through the identity provider only">SSO</span>
+                          <% } else if (u.oidc_linked) { %>
+                            <span class="badge bg-azure-lt ms-1" title="Password account with single sign-on connected">SSO linked</span>
+                          <% } %>
                         </div>
                         <% if (u.display_name) { %>
                           <div class="text-secondary small"><%= u.display_name %></div>
@@ -143,6 +148,10 @@
                     </div>
                   </td>
                   <td>
+                    <% if (oidcEnabled && u.oidc_linked) { %>
+                      <span class="badge bg-secondary-lt"><%= u.role %></span>
+                      <div class="text-secondary small">managed by SSO</div>
+                    <% } else { %>
                     <form method="post" action="/settings/users/<%= u.id %>/role" class="m-0 d-flex gap-2 align-items-center">
                       <select name="role" class="form-select form-select-sm w-auto">
                         <option value="viewer"<%= u.role === 'viewer' ? ' selected' : '' %>>viewer</option>
@@ -151,6 +160,7 @@
                       </select>
                       <button type="submit" class="btn btn-sm btn-outline-primary"><i class="ti ti-check"></i></button>
                     </form>
+                    <% } %>
                   </td>
                   <td>
                     <% if (u.totp_enabled) { %>
@@ -168,11 +178,13 @@
                       <a class="btn btn-sm btn-outline-secondary" href="/settings/users/<%= u.id %>/grants" title="Per-monitor grants">
                         <i class="ti ti-shield-lock"></i>
                       </a>
+                      <% if (u.auth_source !== 'oidc') { %>
                       <form method="post" action="/settings/users/<%= u.id %>/reset-password" class="m-0"
                             data-confirm="Generate a fresh password for <%= u.username %>? They will be forced to change it on next login.">
                         <button type="submit" class="btn btn-sm btn-outline-warning" title="Reset password"><i class="ti ti-refresh"></i></button>
                       </form>
-                      <% if (u.totp_enabled) { %>
+                      <% } %>
+                      <% if (u.totp_enabled && u.auth_source !== 'oidc') { %>
                         <form method="post" action="/settings/users/<%= u.id %>/disable-2fa" class="m-0"
                               data-confirm="Disable 2FA for <%= u.username %>? They will sign in with password only afterwards.">
                           <button type="submit" class="btn btn-sm btn-outline-warning" title="Disable 2FA"><i class="ti ti-shield-off"></i></button>

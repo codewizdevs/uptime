@@ -13,6 +13,11 @@ const toInt = (v, fallback) => {
   return Number.isFinite(n) ? n : fallback;
 };
 
+function oidcGroup(raw) {
+  const v = String(raw || '').trim();
+  return v.toLowerCase() === 'none' ? '' : v;
+}
+
 const driverRaw = String(process.env.DB_DRIVER || 'sqlite').toLowerCase();
 const driver = driverRaw === 'mysql' ? 'mysql' : 'sqlite';
 
@@ -50,6 +55,28 @@ const config = {
   admin: {
     user: process.env.ADMIN_USER || 'admin',
     pass: process.env.ADMIN_PASS || 'admin',
+    passIsDefault: !process.env.ADMIN_PASS || process.env.ADMIN_PASS === 'admin',
+  },
+  // Generic OpenID Connect single sign-on (PocketID, Authelia, Authentik,
+  // Keycloak, …). Disabled unless OIDC_ISSUER and OIDC_CLIENT_ID are set.
+  oidc: {
+    enabled: !!(process.env.OIDC_ISSUER && process.env.OIDC_CLIENT_ID),
+    issuer: (process.env.OIDC_ISSUER || '').trim(),
+    clientId: (process.env.OIDC_CLIENT_ID || '').trim(),
+    clientSecret: (process.env.OIDC_CLIENT_SECRET || '').trim(),
+    scopes: (process.env.OIDC_SCOPES || 'openid profile email groups').trim(),
+    buttonLabel: (process.env.OIDC_BUTTON_LABEL || 'Sign in with SSO').trim(),
+    groupsClaim: (process.env.OIDC_GROUPS_CLAIM || 'groups').trim(),
+    // Group per role: a group name, `*` for any authenticated user, or
+    // empty/`none` to never grant that role through SSO.
+    adminGroup: oidcGroup(process.env.OIDC_ADMIN_GROUP),
+    editorGroup: oidcGroup(process.env.OIDC_EDITOR_GROUP),
+    viewerGroup: oidcGroup(process.env.OIDC_VIEWER_GROUP),
+    autoCreate: toBool(process.env.OIDC_AUTO_CREATE, true),
+    disablePasswordLogin: toBool(process.env.OIDC_DISABLE_PASSWORD_LOGIN, false),
+    // Plain-http issuers send the code, tokens and client secret unencrypted;
+    // they're refused unless explicitly allowed (e.g. a Docker-internal host).
+    allowHttpIssuer: toBool(process.env.OIDC_ALLOW_HTTP_ISSUER, false),
   },
   retention: {
     checksDays: toInt(process.env.CHECKS_RETENTION_DAYS, 90),

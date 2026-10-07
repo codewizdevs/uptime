@@ -203,6 +203,7 @@ If you want a **lightweight self-hosted Uptime Kuma alternative** that you can `
 - **Disable** a user with one click — the next request invalidates their session.
 - **Personal API tokens** — every user mints their own tokens from `/settings/account` and tokens inherit the creator's ACL.
 - **Claim-unowned button** — new DB admin can take ownership of legacy monitors with one click.
+- **OIDC single sign-on** — generic OpenID Connect login (PocketID, Authelia, Authentik, Keycloak, …) with group → role mapping. See [Single sign-on (OIDC)](#single-sign-on-oidc).
 
 ### REST API & metrics
 - Bearer-token authenticated REST under `/api/v1/` with `read` / `write` scopes (admins create them at `/settings/api-tokens`; users mint personal ones at `/settings/account`). **Full CRUD for monitors via JSON** — `POST /api/v1/sites` creates monitors of any of the 7 types, `PATCH /api/v1/sites/:id` does partial updates, `DELETE /api/v1/sites/:id` removes them, plus the existing pause / resume / check-now write actions. Strict per-type validation, ACL inheritance, owner-only ownership reassignment.
@@ -284,6 +285,58 @@ Whitelabeling is managed live from **Settings → Branding & whitelabel** in the
 Older deployments that set `APP_NAME`, `APP_TAGLINE`, `APP_LOGO_PATH`, `APP_FAVICON_PATH`, or `FOOTER_CREDITS_*` in `.env` still work as a fallback when the database value is empty, but the panel is the primary path going forward.
 
 A complete list with comments is in [`.env.example`](./.env.example).
+
+### Single sign-on (OIDC)
+
+Any OpenID Connect provider works (PocketID, Authelia, Authentik, Keycloak, …). Login uses the authorization code flow with PKCE, and `openid-client` does discovery and ID token validation. SSO is enabled when `OIDC_ISSUER` and `OIDC_CLIENT_ID` are set.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `OIDC_ISSUER` | _(unset)_ | Issuer URL, e.g. `https://id.example.com`. Discovery is read from `/.well-known/openid-configuration`. |
+| `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` | _(unset)_ | Client credentials. Leave the secret empty for a public (PKCE-only) client. |
+| `OIDC_SCOPES` | `openid profile email groups` | Requested scopes. |
+| `OIDC_BUTTON_LABEL` | `Sign in with SSO` | Text on the login button. |
+| `OIDC_GROUPS_CLAIM` | `groups` | Claim holding the user's groups (array, or comma-separated string). |
+| `OIDC_ADMIN_GROUP` / `OIDC_EDITOR_GROUP` / `OIDC_VIEWER_GROUP` | _(unset)_ | Group that grants each role: a group name, `*` for any user the provider authenticates, or empty/`none` to never grant that role through SSO. At least one is required. |
+| `OIDC_AUTO_CREATE` | `true` | Create a local account on first SSO login. When `false`, only accounts that are already linked can sign in. |
+| `OIDC_DISABLE_PASSWORD_LOGIN` | `false` | SSO-only: the login page sends users straight to the provider, and only the `.env` super-admin can still sign in with a password, at `/login?local=1`. Requires a non-default `ADMIN_PASS`. |
+| `OIDC_ALLOW_HTTP_ISSUER` | `false` | Allow a plain-`http` `OIDC_ISSUER`, e.g. a provider on a Docker-internal network. Without it, an `http` issuer refuses to start, since the authorization code, tokens and client secret would travel unencrypted. |
+
+Register `${PUBLIC_BASE_URL}/login/oidc/callback` as the redirect URI with your provider. `PUBLIC_BASE_URL` must be the external URL users reach the app on.
+
+Access is decided by groups on every SSO login. The highest role whose group matches wins, and the account's role is updated to match (shown as "managed by SSO" on the users page). Users in no configured group are refused, including existing accounts whose groups were removed at the provider. The last active admin account is never demoted by a group change; a warning is logged instead.
+
+For providers without groups (e.g. Google), use `*`. For example, `OIDC_VIEWER_GROUP=*` with `OIDC_ADMIN_GROUP=uptime-admins` lets everyone in as a viewer and members of `uptime-admins` as admins. `*` lets in **anyone** who can sign in at the provider, so only use it with a provider whose users you trust; a warning is logged at startup. In `docker-compose.yml`, quote it (`OIDC_VIEWER_GROUP: "*"`), since a bare `*` is YAML syntax.
+
+How identities map to accounts:
+
+1. A user previously linked to the provider's identity (issuer + `sub`) signs in as that account.
+2. Otherwise a new account is created (if `OIDC_AUTO_CREATE=true`), with a username from `preferred_username`. These accounts are marked as SSO accounts: they can only sign in through the provider, and admins can't reset their password or 2FA.
+
+Accounts are never linked by email. An existing local user connects their account under **My account → Single sign-on → Connect SSO** while signed in; they are sent to the provider to confirm it's them. A connected account can sign in either way and can be disconnected again (unless password sign-in is disabled).
+
+Links are tied to the issuer: if `OIDC_ISSUER` changes, existing links stop matching and users connect again.
+
+Disabled accounts are refused. SSO logins skip the local TOTP step because MFA is the identity provider's job. SSO sessions end 24 hours after sign-in (password sessions last 14 days), so group changes at the provider take effect within a day; with `OIDC_DISABLE_PASSWORD_LOGIN` the round trip back through the provider is usually invisible. Signing out shows a "signed out" page rather than sending you back to the provider. To cut off access immediately, disable the account in Uptime as well: existing sessions and API tokens are not revoked by the provider. The `.env` super-admin can never sign in through SSO; it stays a password-only break-glass account.
+
+**PocketID example**
+
+1. In PocketID, go to **Administration → OIDC Clients → Add OIDC Client**. Set the callback URL to `https://uptime.example.com/login/oidc/callback` and enable PKCE. Copy the client ID and secret.
+2. Create user groups `uptime-admins` / `uptime-editors` / `uptime-viewers` and add users. If you use **Allowed User Groups** on the client, those groups also control who can sign in.
+3. Add the settings to `.env` and restart:
+
+```env
+PUBLIC_BASE_URL=https://uptime.example.com
+OIDC_ISSUER=https://id.example.com
+OIDC_CLIENT_ID=<client id>
+OIDC_CLIENT_SECRET=<client secret>
+OIDC_BUTTON_LABEL=Sign in with PocketID
+OIDC_ADMIN_GROUP=uptime-admins
+OIDC_EDITOR_GROUP=uptime-editors
+OIDC_VIEWER_GROUP=uptime-viewers
+```
+
+Existing local users who want to keep their monitors and grants should use **Connect SSO** before their first SSO sign-in; otherwise SSO creates a separate account for them.
 
 ---
 
@@ -575,7 +628,7 @@ A detailed phase-by-phase changelog of what's shipped lives in [`PLAN.md`](./PLA
 - [ ] Multi-region probe fleet (worker mode)
 - [ ] On-call schedules and phone-call escalation
 - [ ] Multiple assertions per monitor with AND/OR logic
-- [ ] SAML / OIDC SSO
+- [ ] SAML SSO
 - [ ] Groups / teams (per-group ACLs on top of the existing per-monitor grants)
 - [ ] More notification channels (PagerDuty, Opsgenie, Zulip, Matrix)
 

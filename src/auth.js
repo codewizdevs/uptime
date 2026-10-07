@@ -93,6 +93,11 @@ const authenticator = {
   },
 };
 
+// SSO sessions end this long after sign-in, however active, so the user goes
+// back through the provider and group membership is re-checked. Password
+// sessions keep the cookie lifetime below.
+const SSO_SESSION_MAX_MS = 24 * 60 * 60 * 1000;
+
 function sessionMiddleware() {
   return session({
     secret: config.sessionSecret,
@@ -281,6 +286,14 @@ async function startLogin(req, username, password) {
       audit.fromReq(req, 'login.failed', { actor: cleanUser, meta: { reason: 'disabled' } });
       return { ok: false, reason: 'disabled', message: 'Account is disabled' };
     }
+    // Accounts created by SSO have no usable password, whatever is stored.
+    // Same message as a bad password so usernames aren't confirmed.
+    if (dbUser.auth_source === 'oidc') {
+      rateLimit.recordFailure(req.ip, cleanUser);
+      logger.warn({ username: cleanUser, ip: req.ip }, 'auth.login_sso_only');
+      audit.fromReq(req, 'login.failed', { actor: cleanUser, meta: { reason: 'sso_only' } });
+      return { ok: false, reason: 'bad_credentials', message: 'Invalid username or password' };
+    }
     const ok = await users.verifyPassword(dbUser.password_hash, password);
     if (!ok) {
       rateLimit.recordFailure(req.ip, cleanUser);
@@ -354,21 +367,28 @@ async function finalizeEnvLogin(req, username) {
   audit.fromReq(req, 'login.success', { actor: username, meta: { isEnv: true } });
 }
 
-async function finalizeDbLogin(req, dbUser) {
+async function finalizeDbLogin(req, dbUser, auditMeta) {
   await regenerateSession(req);
-  rateLimit.recordSuccess(req.ip, dbUser.username);
+  const sso = auditMeta?.method === 'oidc';
+  if (sso) {
+    rateLimit.recordSuccessUser(dbUser.username);
+    req.session.ssoLoginAt = Date.now();
+  } else {
+    rateLimit.recordSuccess(req.ip, dbUser.username);
+  }
   req.session.user = {
     id: dbUser.id,
     isEnv: false,
     username: dbUser.username,
     role: dbUser.role,
     mustChangePassword: !!dbUser.must_change_password,
+    authSource: dbUser.auth_source || 'local',
   };
   delete req.session.pendingUser;
   try { await users.recordLogin(dbUser.id, req.ip); }
   catch (err) { logger.warn({ err: err.message, id: dbUser.id }, 'auth.record_login_failed'); }
   logger.info({ username: dbUser.username, ip: req.ip, role: dbUser.role }, 'auth.login_success');
-  audit.fromReq(req, 'login.success', { actor: dbUser.username });
+  audit.fromReq(req, 'login.success', { actor: dbUser.username, meta: auditMeta });
 }
 
 async function complete2fa(req, code) {
@@ -447,16 +467,34 @@ async function loadFreshSessionUser(req) {
     username: fresh.username,
     role: fresh.role,
     mustChangePassword: !!fresh.must_change_password,
+    authSource: fresh.auth_source || 'local',
   };
 }
 
+// Ends an SSO session older than SSO_SESSION_MAX_MS. The session is replaced
+// rather than destroyed so requireAuth can remember the page for after the
+// (usually invisible) round trip through the provider. Returns true if ended.
+async function endExpiredSsoSession(req) {
+  const at = req.session?.ssoLoginAt;
+  if (!at || Date.now() - at < SSO_SESSION_MAX_MS) return false;
+  logger.info({ username: req.session.user?.username }, 'auth.sso_session_expired');
+  delete req.session.returnTo;
+  await regenerateSession(req);
+  return true;
+}
+
+// The session is replaced (old ID invalidated) with one that only carries
+// `signedOut`, so the login page shows "signed out" instead of sending the
+// user straight back to the provider, which would sign them in again.
 function logout(req) {
   const u = req.session?.user;
   const username = u?.username;
   const actorUserId = u && !u.isEnv ? u.id : null;
   const ip = req.ip;
   return new Promise((resolve) => {
-    req.session.destroy(() => {
+    req.session.regenerate((err) => {
+      if (err) logger.warn({ err: err.message }, 'auth.session_regenerate_failed');
+      else req.session.signedOut = true;
       logger.info({ username }, 'auth.logout');
       if (username) audit.record({ actor: username, actorUserId, ip, action: 'logout' });
       resolve();
@@ -469,10 +507,12 @@ module.exports = {
   requireAuth,
   safeReturnTo,
   startLogin,
+  finalizeDbLogin,
   complete2fa,
   logout,
   pendingNeeds2fa,
   loadFreshSessionUser,
+  endExpiredSsoSession,
   // 2FA management — env admin (singleton settings row)
   authenticator,
   getTotpState,

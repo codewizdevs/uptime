@@ -82,6 +82,42 @@
         </form>
       </div>
 
+      <% const ssoOnly = myUser.auth_source === 'oidc'; %>
+      <% if (locals.oidcEnabled || myUser.oidc_linked || ssoOnly) { %>
+      <div class="card mt-3">
+        <div class="card-header">
+          <h3 class="card-title">
+            Single sign-on
+            <% if (myUser.oidc_linked) { %><span class="badge bg-success ms-2">Connected</span>
+            <% } else { %><span class="badge bg-secondary ms-2">Not connected</span><% } %>
+          </h3>
+        </div>
+        <div class="card-body">
+          <% if (ssoOnly) { %>
+            <p class="small text-secondary mb-0">
+              This account was created by single sign-on. Sign in through your identity provider; password and two-factor settings are managed there.
+            </p>
+          <% } else if (myUser.oidc_linked) { %>
+            <p class="small text-secondary mb-3">
+              You can sign in with your identity provider as well as your password.
+            </p>
+            <form method="post" action="/settings/account/sso/disconnect"
+                  data-confirm="Disconnect single sign-on from your account?">
+              <button type="submit" class="btn btn-outline-danger"><i class="ti ti-unlink me-1"></i>Disconnect</button>
+            </form>
+          <% } else { %>
+            <p class="small text-secondary mb-3">
+              Connect your identity provider account to sign in with single sign-on. You'll be sent to the provider to confirm it's you.
+            </p>
+            <form method="post" action="/settings/account/sso/connect">
+              <button type="submit" class="btn btn-primary"><i class="ti ti-link me-1"></i>Connect SSO</button>
+            </form>
+          <% } %>
+        </div>
+      </div>
+      <% } %>
+
+      <% if (!ssoOnly) { %>
       <div class="card mt-3">
         <div class="card-header"><h3 class="card-title">Change password</h3></div>
         <form method="post" action="/settings/account/password">
@@ -111,6 +147,7 @@
           </div>
         </form>
       </div>
+      <% } %>
     </div>
 
     <!-- 2FA -->
@@ -170,6 +207,12 @@
             <form method="post" action="/settings/account/2fa/cancel" class="mt-2 text-end">
               <button type="submit" class="btn btn-link text-secondary">Cancel enrollment</button>
             </form>
+          </div>
+        <% } else if (ssoOnly) { %>
+          <div class="card-body">
+            <p class="small text-secondary mb-0">
+              Two-factor authentication for this account is handled by your identity provider.
+            </p>
           </div>
         <% } else { %>
           <div class="card-body">

@@ -28,24 +28,39 @@
         <h1 class="h2 mt-3 mb-0"><%= branding.appName %></h1>
         <div class="text-secondary small">Sign in to continue</div>
       </div>
-      <form class="card card-md" method="post" action="/login" autocomplete="off">
+      <div class="card card-md">
         <div class="card-body">
           <h2 class="h2 text-center mb-4">Sign in</h2>
+          <% if (typeof signedOut !== 'undefined' && signedOut) { %>
+          <div class="alert alert-info small">You've been signed out.</div>
+          <% } %>
+          <% if (typeof oidc !== 'undefined' && oidc) { %>
+          <a href="/login/oidc" class="btn btn-primary w-100">
+            <i class="ti ti-key me-1"></i> <%= oidc.label %>
+          </a>
+          <% if (showPasswordForm) { %>
+          <div class="hr-text">or</div>
+          <% } %>
+          <% } %>
+          <% if (typeof showPasswordForm === 'undefined' || showPasswordForm) { %>
+          <form method="post" action="/login" autocomplete="off">
           <div class="mb-3">
             <label class="form-label">Username</label>
-            <input type="text" name="username" class="form-control" placeholder="admin" autofocus required>
+            <input type="text" name="username" class="form-control" placeholder="admin" <%= (typeof oidc !== 'undefined' && oidc) ? '' : 'autofocus' %> required>
           </div>
           <div class="mb-2">
             <label class="form-label">Password</label>
             <input type="password" name="password" class="form-control" placeholder="Your password" required>
           </div>
           <div class="form-footer">
-            <button type="submit" class="btn btn-primary w-100">
+            <button type="submit" class="btn <%= (typeof oidc !== 'undefined' && oidc) ? 'btn-outline-secondary' : 'btn-primary' %> w-100">
               <i class="ti ti-login me-1"></i> Sign in
             </button>
           </div>
+          </form>
+          <% } %>
         </div>
-      </form>
+      </div>
     </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/notyf@3.10.0/notyf.min.js"></script>

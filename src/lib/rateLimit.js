@@ -74,6 +74,13 @@ function recordSuccess(ip, username) {
   userBucket.delete((username || '').toLowerCase());
 }
 
+// For logins that don't prove anything about passwords (SSO): clearing the
+// IP bucket there would let anyone with a provider account reset the IP
+// lockout between password-guessing bursts.
+function recordSuccessUser(username) {
+  userBucket.delete((username || '').toLowerCase());
+}
+
 function stats() {
   return {
     ip_keys: ipBucket.size,
@@ -85,6 +92,7 @@ module.exports = {
   checkLocked,
   recordFailure,
   recordSuccess,
+  recordSuccessUser,
   stats,
   IP_MAX_FAILS,
   USER_MAX_FAILS,

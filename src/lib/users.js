@@ -58,8 +58,17 @@ function rowToUser(r) {
     created_at: r.created_at,
     updated_at: r.updated_at,
     created_by_user_id: r.created_by_user_id || null,
+    auth_source: r.auth_source || 'local',
+    oidc_linked: !!r.oidc_sub,
   };
 }
+
+const USER_COLUMNS = `id, username, password_hash, role, email, display_name,
+            totp_secret, totp_enabled, totp_recovery_codes,
+            disabled, must_change_password,
+            last_login_at, last_login_ip,
+            password_changed_at, created_at, updated_at, created_by_user_id,
+            auth_source, oidc_sub`;
 
 async function hashPassword(plain) {
   if (typeof plain !== 'string' || plain.length < 8) {
@@ -88,11 +97,7 @@ async function findByUsername(rawUsername) {
   const username = normalizeUsername(rawUsername);
   if (!username) return null;
   const rows = await db.query(
-    `SELECT id, username, password_hash, role, email, display_name,
-            totp_secret, totp_enabled, totp_recovery_codes,
-            disabled, must_change_password,
-            last_login_at, last_login_ip,
-            password_changed_at, created_at, updated_at, created_by_user_id
+    `SELECT ${USER_COLUMNS}
        FROM users WHERE username = ? LIMIT 1`,
     [username]
   );
@@ -106,11 +111,7 @@ async function findByUsername(rawUsername) {
 async function getById(id) {
   if (id == null) return null;
   const rows = await db.query(
-    `SELECT id, username, password_hash, role, email, display_name,
-            totp_secret, totp_enabled, totp_recovery_codes,
-            disabled, must_change_password,
-            last_login_at, last_login_ip,
-            password_changed_at, created_at, updated_at, created_by_user_id
+    `SELECT ${USER_COLUMNS}
        FROM users WHERE id = ? LIMIT 1`,
     [id]
   );
@@ -122,7 +123,7 @@ async function list() {
     `SELECT id, username, role, email, display_name, disabled,
             must_change_password, totp_enabled,
             last_login_at, last_login_ip, created_at, updated_at,
-            created_by_user_id
+            created_by_user_id, auth_source, oidc_sub
        FROM users ORDER BY username ASC`
   );
   return rows.map(rowToUser);
@@ -138,7 +139,7 @@ async function countAdmins() {
   return Number(rows[0]?.c || 0);
 }
 
-async function create({ username, password, role, email = null, displayName = null, mustChangePassword = false, createdByUserId = null }) {
+async function create({ username, password, role, email = null, displayName = null, mustChangePassword = false, createdByUserId = null, oidcIss = null, oidcSub = null, authSource = 'local' }) {
   const uname = normalizeUsername(username);
   if (!uname || !/^[a-z0-9_.-]{2,64}$/.test(uname)) {
     throw new Error('Username must be 2-64 chars, lowercase letters/digits/._-');
@@ -152,14 +153,18 @@ async function create({ username, password, role, email = null, displayName = nu
   const hash = await hashPassword(password);
   const result = await db.query(
     `INSERT INTO users (username, password_hash, role, email, display_name,
-                        must_change_password, created_by_user_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                        must_change_password, created_by_user_id,
+                        oidc_iss, oidc_sub, auth_source)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       uname, hash, r,
       email ? String(email).trim().slice(0, 255) : null,
       displayName ? String(displayName).trim().slice(0, 120) : null,
       mustChangePassword ? 1 : 0,
       createdByUserId,
+      oidcIss != null ? String(oidcIss) : null,
+      oidcSub != null ? String(oidcSub) : null,
+      authSource === 'oidc' ? 'oidc' : 'local',
     ]
   );
   return getById(result.insertId);
@@ -246,6 +251,76 @@ async function claimUnownedSites(userId) {
   return result.affectedRows ?? result.changes ?? 0;
 }
 
+// ─── OIDC helpers ──────────────────────────────────────────────────────
+// A provider account is identified by (issuer, subject): `sub` is only unique
+// within one issuer, so a lookup never matches on the subject alone.
+async function findByOidcIdentity(iss, sub) {
+  if (!iss || !sub) return null;
+  const rows = await db.query(
+    `SELECT ${USER_COLUMNS} FROM users WHERE oidc_iss = ? AND oidc_sub = ? LIMIT 1`,
+    [String(iss), String(sub)]
+  );
+  return rowToUser(rows[0] || null);
+}
+
+// Links only an account that isn't linked yet. Returns false when the account
+// already has a link or the identity belongs to another account (unique
+// index), so callers never overwrite or duplicate a link.
+async function linkOidcIdentity(id, iss, sub) {
+  try {
+    const result = await db.query(
+      `UPDATE users SET oidc_iss = ?, oidc_sub = ?, updated_at = ${db.nowMs()}
+        WHERE id = ? AND oidc_sub IS NULL`,
+      [String(iss), String(sub), id]
+    );
+    return (result.affectedRows ?? result.changes ?? 0) > 0;
+  } catch (err) {
+    if (/unique|duplicate/i.test(err.message)) return false;
+    throw err;
+  }
+}
+
+// Only local accounts can be unlinked; an SSO-created account has no other
+// way to sign in.
+async function unlinkOidcIdentity(id) {
+  const result = await db.query(
+    `UPDATE users SET oidc_iss = NULL, oidc_sub = NULL, updated_at = ${db.nowMs()}
+      WHERE id = ? AND auth_source = 'local'`,
+    [id]
+  );
+  return (result.affectedRows ?? result.changes ?? 0) > 0;
+}
+
+// Turn an IdP-supplied name into something that passes create()'s username
+// rules, then append a numeric suffix until it's free.
+async function availableUsername(raw) {
+  let base = normalizeUsername(raw).replace(/[^a-z0-9_.-]/g, '').slice(0, 56);
+  if (base.length < 2) base = 'user';
+  let candidate = base;
+  for (let i = 2; i < 1000; i++) {
+    if (!isReservedUsername(candidate) && !(await findByUsername(candidate))) return candidate;
+    candidate = `${base}-${i}`;
+  }
+  throw new Error('Could not find a free username');
+}
+
+// Create a DB user backed by an OIDC identity. The password is random, never
+// shown and never accepted: auth_source 'oidc' accounts only sign in through
+// the identity provider.
+async function createOidcUser({ iss, sub, preferredUsername, email, displayName, role }) {
+  const username = await availableUsername(preferredUsername || (email || '').split('@')[0]);
+  return create({
+    username,
+    password: crypto.randomBytes(32).toString('base64'),
+    role,
+    email,
+    displayName,
+    oidcIss: iss,
+    oidcSub: sub,
+    authSource: 'oidc',
+  });
+}
+
 // Synthetic "user" object representing the env super-admin. Used wherever an
 // acting user is required but the request came from the .env account.
 function envAdminUser() {
@@ -282,5 +357,9 @@ module.exports = {
   recordLogin,
   deleteUser,
   claimUnownedSites,
+  findByOidcIdentity,
+  linkOidcIdentity,
+  unlinkOidcIdentity,
+  createOidcUser,
   envAdminUser,
 };

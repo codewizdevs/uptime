@@ -23,6 +23,7 @@ const { parseId } = require('../lib/ids');
 const acl = require('../lib/acl');
 const users = require('../lib/users');
 const grants = require('../lib/grants');
+const oidc = require('../lib/oidc');
 const {
   getUserTotpState,
   saveUserTotpState,
@@ -748,6 +749,7 @@ router.get('/settings/users', async (req, res, next) => {
       users: list,
       sitesUnowned,
       reservedUsername: config.admin.user,
+      oidcEnabled: config.oidc.enabled,
       newUser: req.session.newUserCreds || null,
     });
     delete req.session.newUserCreds;
@@ -786,6 +788,10 @@ router.post('/settings/users/:id/role', async (req, res, next) => {
     if (id == null) return res.redirect('/settings/users');
     const u = await users.getById(id);
     if (!u) return res.redirect('/settings/users');
+    if (config.oidc.enabled && u.oidc_linked) {
+      req.flash('error', `${u.username}'s role is managed by single sign-on groups.`);
+      return res.redirect('/settings/users');
+    }
     const newRole = String(req.body.role || 'viewer');
     if (u.role === 'admin' && newRole !== 'admin') {
       const adminCount = await users.countAdmins();
@@ -829,6 +835,10 @@ router.post('/settings/users/:id/reset-password', async (req, res, next) => {
     if (id == null) return res.redirect('/settings/users');
     const u = await users.getById(id);
     if (!u) return res.redirect('/settings/users');
+    if (u.auth_source === 'oidc') {
+      req.flash('error', `${u.username} signs in with single sign-on and has no password.`);
+      return res.redirect('/settings/users');
+    }
     const initialPassword = users.generateInitialPassword();
     await users.setPassword(id, initialPassword, { mustChange: true });
     audit.fromReq(req, 'user.password_reset', { targetType: 'user', targetId: id });
@@ -844,6 +854,10 @@ router.post('/settings/users/:id/disable-2fa', async (req, res, next) => {
     if (id == null) return res.redirect('/settings/users');
     const u = await users.getById(id);
     if (!u) return res.redirect('/settings/users');
+    if (u.auth_source === 'oidc') {
+      req.flash('error', `${u.username} signs in with single sign-on; MFA is managed by the identity provider.`);
+      return res.redirect('/settings/users');
+    }
     await users.setTotp(id, { secret: null, enabled: false, recoveryCodes: null });
     audit.fromReq(req, 'user.2fa_disabled_by_admin', { targetType: 'user', targetId: id });
     req.flash('success', `2FA disabled for ${u.username}.`);
@@ -976,6 +990,7 @@ router.get('/settings/account', async (req, res, next) => {
     res.render('settings-account', {
       title: 'My account',
       isEnv: false,
+      oidcEnabled: config.oidc.enabled,
       myUser,
       myTokens,
       pending,
@@ -1001,10 +1016,45 @@ router.post('/settings/account/profile', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/settings/account/password', async (req, res, next) => {
+// "Connect SSO": the signed-in local user authenticates at the provider and
+// the callback (routes/auth.js, link mode) attaches that identity to them.
+router.post('/settings/account/sso/connect', async (req, res, next) => {
+  const u = req.session.user;
+  if (!config.oidc.enabled || !u || u.isEnv || u.authSource === 'oidc') {
+    return res.redirect('/settings/account');
+  }
+  try {
+    const { url, pending } = await oidc.beginLogin();
+    req.session.oidcPending = { ...pending, mode: 'link', userId: u.id };
+    req.session.save((err) => (err ? next(err) : res.redirect(url)));
+  } catch (err) {
+    logger.error({ err: err.message }, 'oidc.begin_failed');
+    req.flash('error', 'Single sign-on is unavailable right now');
+    res.redirect('/settings/account');
+  }
+});
+
+router.post('/settings/account/sso/disconnect', async (req, res, next) => {
   try {
     const u = req.session.user;
     if (!u || u.isEnv) return res.redirect('/settings/account');
+    // With password sign-in disabled, disconnecting would lock the user out.
+    if (config.oidc.disablePasswordLogin) {
+      req.flash('error', 'Password sign-in is disabled, so single sign-on cannot be disconnected');
+      return res.redirect('/settings/account');
+    }
+    if (await users.unlinkOidcIdentity(u.id)) {
+      audit.fromReq(req, 'account.sso_disconnected');
+      req.flash('success', 'Single sign-on disconnected');
+    }
+    res.redirect('/settings/account');
+  } catch (err) { next(err); }
+});
+
+router.post('/settings/account/password', async (req, res, next) => {
+  try {
+    const u = req.session.user;
+    if (!u || u.isEnv || u.authSource === 'oidc') return res.redirect('/settings/account');
     const cur = await users.findByUsername(u.username);
     if (!cur) return res.redirect('/logout');
     const currentPw = String(req.body.current_password || '');
@@ -1038,7 +1088,7 @@ router.post('/settings/account/password', async (req, res, next) => {
 router.post('/settings/account/2fa/start', async (req, res, next) => {
   try {
     const u = req.session.user;
-    if (!u || u.isEnv) return res.redirect('/settings/account');
+    if (!u || u.isEnv || u.authSource === 'oidc') return res.redirect('/settings/account');
     const state = await getUserTotpState(u.id);
     if (state.enabled) {
       req.flash('error', '2FA is already enabled. Disable it first to re-enroll.');
